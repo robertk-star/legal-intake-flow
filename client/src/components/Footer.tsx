@@ -1,5 +1,4 @@
 import { Link } from "wouter";
-import { Scale } from "lucide-react";
 
 export default function Footer() {
   const year = new Date().getFullYear();
@@ -10,14 +9,17 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10 pb-10 border-b border-white/10">
           {/* Brand */}
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-md bg-white/10 flex items-center justify-center flex-shrink-0">
-                <Scale className="w-3.5 h-3.5 text-white" />
+            <Link href="/" className="inline-flex">
+              {/* White-background logo shown on dark footer with a subtle rounded container */}
+              <div className="bg-white rounded-lg px-3 py-2 inline-flex items-center">
+                <img
+                  src="/images/lif-logo.png"
+                  alt="Legal Intake Flow"
+                  className="h-9 w-auto object-contain"
+                  draggable={false}
+                />
               </div>
-              <span className="font-serif font-semibold text-white text-base leading-none">
-                Legal Intake Flow
-              </span>
-            </div>
+            </Link>
             <p className="text-sm text-white/55 leading-relaxed max-w-xs">
               Helping connect disability benefits claimants with attorneys and advocates.
             </p>

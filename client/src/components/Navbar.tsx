@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Scale } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 const NAV_LINKS = [
   { label: "How It Works", href: "/how-it-works" },
@@ -33,13 +33,13 @@ export default function Navbar() {
       <div className="container">
         <div className="flex items-center justify-between h-16 md:h-18">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-[oklch(20%_0.05_255)] flex items-center justify-center flex-shrink-0 group-hover:bg-[oklch(26%_0.06_255)] transition-colors">
-              <Scale className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-serif font-semibold text-[oklch(20%_0.05_255)] text-lg leading-none tracking-tight">
-              Legal Intake Flow
-            </span>
+          <Link href="/" className="flex items-center group">
+            <img
+              src="/images/lif-logo.png"
+              alt="Legal Intake Flow"
+              className="h-9 md:h-12 w-auto object-contain"
+              draggable={false}
+            />
           </Link>
 
           {/* Desktop nav */}
