@@ -1,4 +1,12 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  bigint,
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -11,7 +19,7 @@ export const users = mysqlTable("users", {
    * Use this for relations between tables.
    */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
+  /** OAuth identifier (openId) returned from the auth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -25,16 +33,41 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// ── Partner access requests ───────────────────────────────────────────────
+// ── Partner access requests ───────────────────────────────────────────────────
+// Phase 2: full intake schema matching sql/section01_partner_access_requests.sql
+
 export const partnerAccessRequests = mysqlTable("partner_access_requests", {
-  id:        int("id").autoincrement().primaryKey(),
-  name:      varchar("name", { length: 200 }).notNull(),
-  firm:      varchar("firm", { length: 300 }),
-  email:     varchar("email", { length: 320 }).notNull(),
-  phone:     varchar("phone", { length: 40 }),
-  state:     varchar("state", { length: 100 }),
-  message:   text("message"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+
+  createdAt: timestamp("created_at", { mode: "date", fsp: 3 }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date", fsp: 3 }).defaultNow().onUpdateNow().notNull(),
+
+  // Contact
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName:  varchar("last_name",  { length: 100 }).notNull(),
+  firmName:  varchar("firm_name",  { length: 300 }).notNull(),
+  email:     varchar("email",      { length: 320 }).notNull(),
+  phone:     varchar("phone",      { length: 40  }).notNull(),
+  website:   varchar("website",    { length: 500 }),
+
+  // Practice details
+  statesServed:        text("states_served").notNull(),
+  practiceArea:        varchar("practice_area",         { length: 100 }).notNull(),
+  monthlyLeadCapacity: varchar("monthly_lead_capacity", { length: 20  }).notNull(),
+
+  // Free-form notes
+  message: text("message"),
+
+  // Workflow
+  status: mysqlEnum("status", [
+    "new",
+    "reviewed",
+    "approved",
+    "declined",
+    "contacted",
+  ]).notNull().default("new"),
+
+  source: varchar("source", { length: 100 }).notNull().default("legalintakeflow.com"),
 });
 
 export type PartnerAccessRequest = typeof partnerAccessRequests.$inferSelect;

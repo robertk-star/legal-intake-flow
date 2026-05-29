@@ -1,6 +1,11 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, partnerAccessRequests, InsertPartnerAccessRequest } from "../drizzle/schema";
+import {
+  InsertUser,
+  users,
+  partnerAccessRequests,
+  InsertPartnerAccessRequest,
+} from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -93,9 +98,10 @@ export async function getUserByOpenId(openId: string) {
 
 export async function insertPartnerAccessRequest(
   data: InsertPartnerAccessRequest
-) {
+): Promise<{ insertId: number }> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const result = await db.insert(partnerAccessRequests).values(data);
-  return result;
+  // mysql2 returns insertId as a bigint; coerce to number for the response
+  return { insertId: Number((result as unknown as { insertId: bigint | number }[])[0]?.insertId ?? 0) };
 }

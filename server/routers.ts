@@ -4,7 +4,33 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { insertPartnerAccessRequest } from "./db";
-import { notifyOwner } from "./_core/notification";
+
+// ── Validation schema (shared shape used by both router and client) ──────────
+
+export const partnerAccessInputSchema = z.object({
+  // Required contact fields
+  firstName: z.string().min(1, "First name is required").max(100).trim(),
+  lastName:  z.string().min(1, "Last name is required").max(100).trim(),
+  firmName:  z.string().min(1, "Firm name is required").max(300).trim(),
+  email:     z.string().min(1, "Email is required").email("Enter a valid email address").max(320),
+  phone:     z.string().min(1, "Phone number is required").max(40).trim(),
+
+  // Required practice fields
+  statesServed:        z.string().min(1, "State(s) served is required").max(2000).trim(),
+  practiceArea:        z.string().min(1, "Practice area is required").max(100),
+  monthlyLeadCapacity: z.string().min(1, "Monthly lead capacity is required").max(20),
+
+  // Optional fields
+  website: z.string().max(500).trim().optional(),
+  message: z.string().max(5000).trim().optional(),
+
+  // Honeypot — must be empty; bots fill it, humans don't see it
+  _hp: z.string().max(200).optional(),
+});
+
+export type PartnerAccessInput = z.infer<typeof partnerAccessInputSchema>;
+
+// ── App router ───────────────────────────────────────────────────────────────
 
 export const appRouter = router({
   system: systemRouter,
@@ -18,48 +44,38 @@ export const appRouter = router({
     }),
   }),
 
-  // ── Partner access requests ──────────────────────────────────────────────
+  // ── Partner access requests ────────────────────────────────────────────────
   partnerAccess: router({
     submit: publicProcedure
-      .input(
-        z.object({
-          name:    z.string().min(1).max(200),
-          firm:    z.string().max(300).optional(),
-          email:   z.string().email().max(320),
-          phone:   z.string().max(40).optional(),
-          state:   z.string().max(100).optional(),
-          message: z.string().max(5000).optional(),
-        })
-      )
+      .input(partnerAccessInputSchema)
       .mutation(async ({ input }) => {
-        await insertPartnerAccessRequest({
-          name:    input.name,
-          firm:    input.firm ?? null,
-          email:   input.email,
-          phone:   input.phone ?? null,
-          state:   input.state ?? null,
-          message: input.message ?? null,
-        });
-
-        // Notify owner of new access request
-        try {
-          await notifyOwner({
-            title: `New Partner Access Request — ${input.name}`,
-            content: [
-              `**Name:** ${input.name}`,
-              `**Firm:** ${input.firm ?? "—"}`,
-              `**Email:** ${input.email}`,
-              `**Phone:** ${input.phone ?? "—"}`,
-              `**State:** ${input.state ?? "—"}`,
-              `**Message:** ${input.message ?? "—"}`,
-            ].join("\n"),
-          });
-        } catch (err) {
-          // Non-fatal: log but don't fail the submission
-          console.error("[partnerAccess.submit] notifyOwner failed:", err);
+        // ── Honeypot check ────────────────────────────────────────────────────
+        // If the hidden _hp field is filled, silently return success without
+        // inserting — prevents simple bot spam without affecting real users.
+        if (input._hp && input._hp.trim().length > 0) {
+          return { success: true, requestId: 0 } as const;
         }
 
-        return { success: true } as const;
+        // ── Normalize ─────────────────────────────────────────────────────────
+        const normalized = {
+          firstName:           input.firstName.trim(),
+          lastName:            input.lastName.trim(),
+          firmName:            input.firmName.trim(),
+          email:               input.email.trim().toLowerCase(),
+          phone:               input.phone.trim(),
+          website:             input.website?.trim() || null,
+          statesServed:        input.statesServed.trim(),
+          practiceArea:        input.practiceArea,
+          monthlyLeadCapacity: input.monthlyLeadCapacity,
+          message:             input.message?.trim() || null,
+          status:              "new" as const,
+          source:              "legalintakeflow.com",
+        };
+
+        // ── Insert ────────────────────────────────────────────────────────────
+        const { insertId } = await insertPartnerAccessRequest(normalized);
+
+        return { success: true, requestId: insertId } as const;
       }),
   }),
 });
