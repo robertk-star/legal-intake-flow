@@ -20,11 +20,11 @@ export function Header() {
         {/* Logo */}
         <Link href="/" className="flex-shrink-0" aria-label="Legal Intake Flow — Home">
           <Image
-            src="/images/lif-logo.png"
+            src="/images/lif-name-logo.png"
             alt="Legal Intake Flow"
-            width={220}
+            width={320}
             height={60}
-            className="h-10 w-auto object-contain sm:h-12"
+            className="h-8 w-auto max-w-[200px] object-contain sm:h-11 sm:max-w-[280px]"
             priority
             draggable={false}
           />

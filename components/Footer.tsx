@@ -21,11 +21,11 @@ export function Footer() {
             <Link href="/" aria-label="Legal Intake Flow — Home">
               <div className="rounded-lg bg-white px-3 py-2 inline-block">
                 <Image
-                  src="/images/lif-logo.png"
+                  src="/images/lif-name-logo.png"
                   alt="Legal Intake Flow"
-                  width={180}
+                  width={260}
                   height={50}
-                  className="h-9 w-auto object-contain"
+                  className="h-9 w-auto max-w-[220px] object-contain"
                   draggable={false}
                 />
               </div>
