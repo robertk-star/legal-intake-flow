@@ -34,9 +34,21 @@ Legal Intake Flow is an attorney and advocate partner platform delivering consen
 
 ## API Routes
 
+### Public
+
 | Route | Method | Description |
 |---|---|---|
 | `/api/partner-access-requests` | `POST` | Submit a partner access request — validates, checks honeypot, inserts to Supabase |
+
+### Admin (HTTP-only cookie required)
+
+| Route | Method | Description |
+|---|---|---|
+| `/api/admin/login` | `POST` | Validate `LIF_ADMIN_PASSWORD`, set `lif_admin_session` HTTP-only cookie (8h) |
+| `/api/admin/logout` | `POST` | Clear admin session cookie |
+| `/api/admin/partner-requests` | `GET` | List requests — supports `status`, `search`, `limit` query params |
+| `/api/admin/partner-requests/[id]` | `GET` | Get single request detail |
+| `/api/admin/partner-requests/[id]` | `PATCH` | Update `status` and/or `internal_notes` |
 
 ---
 
@@ -46,6 +58,8 @@ Copy `.env.example` to `.env.local` and fill in your values.
 
 | Variable | Required | Description |
 |---|---|---|
+| `LIF_ADMIN_PASSWORD` | Yes | Password for the internal admin area at `/admin/login` — **server only, never expose client-side** |
+| `LIF_ADMIN_SESSION_SECRET` | Recommended | HMAC SHA-256 signing secret for admin session tokens. Falls back to `LIF_ADMIN_PASSWORD` if not set. Generate with `openssl rand -base64 48`. **Server only.** |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon/public key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key — **server only, never expose client-side** |
