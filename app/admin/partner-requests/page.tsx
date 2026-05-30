@@ -27,6 +27,16 @@ interface PartnerRequest {
   source: string;
 }
 
+interface PartnerAccount {
+  id: string;
+  firm_name: string;
+  contact_first_name: string;
+  contact_last_name: string;
+  email: string;
+  status: string;
+  created_at: string;
+}
+
 const VALID_STATUSES: Status[] = ["new", "reviewed", "contacted", "approved", "declined"];
 
 const STATUS_COLORS: Record<Status, string> = {
@@ -50,6 +60,239 @@ function StatusBadge({ status }: { status: Status }) {
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_COLORS[status] ?? "bg-gray-100 text-gray-700"}`}>
       {status}
     </span>
+  );
+}
+
+// ── Partner Account Panel ─────────────────────────────────────────────────────
+
+function PartnerAccountPanel({
+  request,
+  currentStatus,
+}: {
+  request: PartnerRequest;
+  currentStatus: Status;
+}) {
+  const [account, setAccount] = useState<PartnerAccount | null>(null);
+  const [loadingAccount, setLoadingAccount] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [loginUrl, setLoginUrl] = useState<string | null>(null);
+  const [linkExpiry, setLinkExpiry] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Auto-load existing partner account via GET on mount
+  useEffect(() => {
+    async function loadAccount() {
+      setLoadingAccount(true);
+      setLoadError(null);
+      try {
+        const res = await fetch(`/api/admin/partner-requests/${request.id}/partner-account`);
+        const data = (await res.json()) as {
+          success: boolean;
+          found: boolean;
+          data?: PartnerAccount;
+          error?: string;
+        };
+        if (data.success && data.found && data.data) {
+          setAccount(data.data);
+        }
+      } catch {
+        setLoadError("Failed to check for existing partner account.");
+      } finally {
+        setLoadingAccount(false);
+      }
+    }
+    loadAccount();
+  }, [request.id]);
+
+  async function handleCreateAccount() {
+    setCreating(true);
+    setCreateError(null);
+
+    try {
+      const res = await fetch(
+        `/api/admin/partner-requests/${request.id}/create-partner-account`,
+        { method: "POST" }
+      );
+      const data = (await res.json()) as {
+        success: boolean;
+        alreadyExists?: boolean;
+        data?: PartnerAccount;
+        error?: string;
+      };
+
+      if (data.success && data.data) {
+        setAccount(data.data);
+      } else {
+        setCreateError(data.error ?? "Failed to create partner account.");
+      }
+    } catch {
+      setCreateError("Network error. Please try again.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleGenerateLink() {
+    if (!account) return;
+    setGeneratingLink(true);
+    setLinkError(null);
+    setLoginUrl(null);
+    setCopied(false);
+
+    try {
+      const res = await fetch(
+        `/api/admin/partners/${account.id}/generate-login-link`,
+        { method: "POST" }
+      );
+      const data = (await res.json()) as {
+        success: boolean;
+        loginUrl?: string;
+        expiresAt?: string;
+        error?: string;
+      };
+
+      if (data.success && data.loginUrl) {
+        setLoginUrl(data.loginUrl);
+        setLinkExpiry(data.expiresAt ?? null);
+      } else {
+        setLinkError(data.error ?? "Failed to generate login link.");
+      }
+    } catch {
+      setLinkError("Network error. Please try again.");
+    } finally {
+      setGeneratingLink(false);
+    }
+  }
+
+  async function handleCopy() {
+    if (!loginUrl) return;
+    try {
+      await navigator.clipboard.writeText(loginUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      // silent fallback
+    }
+  }
+
+  const isApproved = currentStatus === "approved";
+
+  return (
+    <section className="border-t border-gray-100 pt-4 space-y-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        Partner Account
+      </h3>
+
+      {/* Loading state */}
+      {loadingAccount && (
+        <div className="animate-pulse h-8 rounded bg-gray-100" />
+      )}
+
+      {/* Load error */}
+      {!loadingAccount && loadError && (
+        <p className="text-sm text-red-600">{loadError}</p>
+      )}
+
+      {/* No account yet */}
+      {!loadingAccount && !account && (
+        <div className="space-y-3">
+          {/* Block message if not approved */}
+          {!isApproved && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <strong>Status must be set to &ldquo;Approved&rdquo;</strong> before a partner account can be created.
+              Current status: <span className="font-semibold capitalize">{currentStatus}</span>.
+            </div>
+          )}
+
+          <button
+            onClick={handleCreateAccount}
+            disabled={creating || !isApproved}
+            title={!isApproved ? "Set request status to Approved before creating a partner account." : undefined}
+            className="rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {creating ? "Creating Account…" : "Create Partner Account"}
+          </button>
+
+          {createError && (
+            <p className="text-sm text-red-600">{createError}</p>
+          )}
+        </div>
+      )}
+
+      {/* Account exists */}
+      {!loadingAccount && account && (
+        <div className="space-y-4">
+          {/* Account summary */}
+          <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm">
+            <p className="font-semibold text-green-800">{account.firm_name}</p>
+            <p className="text-green-700">
+              {account.contact_first_name} {account.contact_last_name} — {account.email}
+            </p>
+            <p className="mt-1 text-xs text-green-600">
+              Account status: <span className="font-semibold capitalize">{account.status}</span>
+              {" · "}Created {formatDate(account.created_at)}
+            </p>
+          </div>
+
+          {/* Generate login link */}
+          <div className="space-y-3">
+            <button
+              onClick={handleGenerateLink}
+              disabled={generatingLink}
+              className="rounded-md bg-[#1a3a8f] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#162e75] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generatingLink ? "Generating…" : "Generate Partner Login Link"}
+            </button>
+
+            {linkError && (
+              <p className="text-sm text-red-600">{linkError}</p>
+            )}
+
+            {loginUrl && (
+              <div className="space-y-2">
+                {/* One-time warning */}
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <strong>Copy this link now.</strong> For security, it will only be shown once.
+                  {linkExpiry && (
+                    <span className="block mt-0.5 text-amber-700">
+                      Expires:{" "}
+                      {new Date(linkExpiry).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  )}
+                </div>
+
+                {/* Link display + copy */}
+                <div className="flex items-start gap-2">
+                  <code className="flex-1 break-all rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-800 font-mono">
+                    {loginUrl}
+                  </code>
+                  <button
+                    onClick={handleCopy}
+                    className={`shrink-0 rounded-md px-3 py-2 text-xs font-semibold transition-colors ${
+                      copied
+                        ? "bg-green-600 text-white"
+                        : "bg-gray-800 text-white hover:bg-gray-700"
+                    }`}
+                  >
+                    {copied ? "Copied ✓" : "Copy Login Link"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -82,7 +325,11 @@ function DetailModal({
         body: JSON.stringify({ status, internal_notes: notes }),
       });
 
-      const data = (await res.json()) as { success: boolean; data?: PartnerRequest; error?: string };
+      const data = (await res.json()) as {
+        success: boolean;
+        data?: PartnerRequest;
+        error?: string;
+      };
 
       if (data.success && data.data) {
         setSaveSuccess(true);
@@ -101,7 +348,9 @@ function DetailModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="relative w-full max-w-2xl rounded-xl bg-white shadow-xl">
         {/* Header */}
@@ -132,7 +381,14 @@ function DetailModal({
               <Field label="Email" value={<a href={`mailto:${request.email}`} className="text-blue-600 hover:underline">{request.email}</a>} />
               <Field label="Phone" value={request.phone} />
               {request.website && (
-                <Field label="Website" value={<a href={request.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{request.website}</a>} />
+                <Field
+                  label="Website"
+                  value={
+                    <a href={request.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
+                      {request.website}
+                    </a>
+                  }
+                />
               )}
               <Field label="Source" value={request.source} />
             </dl>
@@ -152,7 +408,9 @@ function DetailModal({
           {request.message && (
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Message</h3>
-              <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700 whitespace-pre-wrap">{request.message}</p>
+              <p className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700 whitespace-pre-wrap">
+                {request.message}
+              </p>
             </section>
           )}
 
@@ -203,14 +461,14 @@ function DetailModal({
           {saveError && (
             <p className="text-sm text-red-600">{saveError}</p>
           )}
+
+          {/* Partner Account Panel — passes live status so the Create button reflects unsaved changes */}
+          <PartnerAccountPanel request={request} currentStatus={status} />
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
-          <button
-            onClick={onClose}
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
+          <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">
             Close
           </button>
           <button
@@ -248,43 +506,48 @@ export default function AdminPartnerRequestsPage() {
   const [selectedRequest, setSelectedRequest] = useState<PartnerRequest | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const fetchRequests = useCallback(async (q: string, s: string) => {
-    setLoading(true);
-    setFetchError(null);
+  const fetchRequests = useCallback(
+    async (q: string, s: string) => {
+      setLoading(true);
+      setFetchError(null);
 
-    const params = new URLSearchParams();
-    if (s) params.set("status", s);
-    if (q) params.set("search", q);
+      const params = new URLSearchParams();
+      if (s) params.set("status", s);
+      if (q) params.set("search", q);
 
-    try {
-      const res = await fetch(`/api/admin/partner-requests?${params.toString()}`);
+      try {
+        const res = await fetch(`/api/admin/partner-requests?${params.toString()}`);
 
-      if (res.status === 401) {
-        setAuthError(true);
-        router.push("/admin/login");
-        return;
+        if (res.status === 401) {
+          setAuthError(true);
+          router.push("/admin/login");
+          return;
+        }
+
+        const data = (await res.json()) as {
+          success: boolean;
+          data?: PartnerRequest[];
+          error?: string;
+        };
+
+        if (data.success && data.data) {
+          setRequests(data.data);
+        } else {
+          setFetchError(data.error ?? "Failed to load requests.");
+        }
+      } catch {
+        setFetchError("Network error. Please refresh.");
+      } finally {
+        setLoading(false);
       }
+    },
+    [router]
+  );
 
-      const data = (await res.json()) as { success: boolean; data?: PartnerRequest[]; error?: string };
-
-      if (data.success && data.data) {
-        setRequests(data.data);
-      } else {
-        setFetchError(data.error ?? "Failed to load requests.");
-      }
-    } catch {
-      setFetchError("Network error. Please refresh.");
-    } finally {
-      setLoading(false);
-    }
-  }, [router]);
-
-  // Initial load
   useEffect(() => {
     fetchRequests("", "");
   }, [fetchRequests]);
 
-  // Debounced search/filter
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchRequests(search, statusFilter);
@@ -342,7 +605,9 @@ export default function AdminPartnerRequestsPage() {
           <div>
             <h1 className="text-2xl font-bold text-[#0d1b2e]">Partner Requests</h1>
             <p className="mt-1 text-sm text-gray-500">
-              {loading ? "Loading…" : `${requests.length} request${requests.length !== 1 ? "s" : ""}`}
+              {loading
+                ? "Loading…"
+                : `${requests.length} request${requests.length !== 1 ? "s" : ""}`}
             </p>
           </div>
 
@@ -362,7 +627,9 @@ export default function AdminPartnerRequestsPage() {
             >
               <option value="">All Statuses</option>
               {VALID_STATUSES.map((s) => (
-                <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                <option key={s} value={s} className="capitalize">
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </option>
               ))}
             </select>
           </div>
@@ -386,7 +653,10 @@ export default function AdminPartnerRequestsPage() {
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    {["Date", "Name", "Firm", "Email", "Phone", "States", "Practice Area", "Capacity", "Status", "Actions"].map((col) => (
+                    {[
+                      "Date", "Name", "Firm", "Email", "Phone",
+                      "States", "Practice Area", "Capacity", "Status", "Actions",
+                    ].map((col) => (
                       <th
                         key={col}
                         className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 whitespace-nowrap"
@@ -409,13 +679,19 @@ export default function AdminPartnerRequestsPage() {
                       ))
                     : requests.map((req) => (
                         <tr key={req.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(req.created_at)}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                            {formatDate(req.created_at)}
+                          </td>
                           <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
                             {req.first_name} {req.last_name}
                           </td>
-                          <td className="px-4 py-3 text-gray-700 whitespace-nowrap max-w-[160px] truncate">{req.firm_name}</td>
+                          <td className="px-4 py-3 text-gray-700 whitespace-nowrap max-w-[160px] truncate">
+                            {req.firm_name}
+                          </td>
                           <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                            <a href={`mailto:${req.email}`} className="hover:text-blue-600 hover:underline">{req.email}</a>
+                            <a href={`mailto:${req.email}`} className="hover:text-blue-600 hover:underline">
+                              {req.email}
+                            </a>
                           </td>
                           <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{req.phone}</td>
                           <td className="px-4 py-3 text-gray-700 max-w-[120px] truncate">{req.states_served}</td>
