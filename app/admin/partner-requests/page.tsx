@@ -35,6 +35,17 @@ interface PartnerAccount {
   email: string;
   status: string;
   created_at: string;
+  // Phase 6 preference fields (may be null if section04 migration not yet run)
+  accepting_leads:         boolean | null;
+  lead_status:             string | null;
+  monthly_lead_capacity:   string | null;
+  accepted_case_types:     string[] | null;
+  accepted_languages:      string[] | null;
+  accepts_initial_filings: boolean | null;
+  accepts_appeals:         boolean | null;
+  accepts_hearings:        boolean | null;
+  accepts_child_cases:     boolean | null;
+  lead_notes:              string | null;
 }
 
 const VALID_STATUSES: Status[] = ["new", "reviewed", "contacted", "approved", "declined"];
@@ -253,6 +264,67 @@ function PartnerAccountPanel({
               {" · "}Created {formatDate(account.created_at)}
             </p>
           </div>
+
+          {/* Read-only partner preferences */}
+          {(account.lead_status !== null || account.accepting_leads !== null) && (
+            <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Lead Preferences</p>
+              <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 text-sm">
+                <PrefField
+                  label="Accepting Leads"
+                  value={account.accepting_leads === null ? "—" : account.accepting_leads ? "Yes" : "No"}
+                />
+                <PrefField
+                  label="Lead Status"
+                  value={account.lead_status
+                    ? account.lead_status.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())
+                    : "—"}
+                />
+                <PrefField
+                  label="Monthly Lead Capacity"
+                  value={account.monthly_lead_capacity ?? "—"}
+                />
+                <PrefField
+                  label="Benefit Programs"
+                  value={
+                    account.accepted_case_types && account.accepted_case_types.length > 0
+                      ? account.accepted_case_types.join(", ")
+                      : "—"
+                  }
+                />
+                <PrefField
+                  label="Initial Filings"
+                  value={account.accepts_initial_filings === null ? "—" : account.accepts_initial_filings ? "Yes" : "No"}
+                />
+                <PrefField
+                  label="Appeals"
+                  value={account.accepts_appeals === null ? "—" : account.accepts_appeals ? "Yes" : "No"}
+                />
+                <PrefField
+                  label="Hearings"
+                  value={account.accepts_hearings === null ? "—" : account.accepts_hearings ? "Yes" : "No"}
+                />
+                <PrefField
+                  label="Child Disability Cases"
+                  value={account.accepts_child_cases === null ? "—" : account.accepts_child_cases ? "Yes" : "No"}
+                />
+                <PrefField
+                  label="Accepted Languages"
+                  value={
+                    account.accepted_languages && account.accepted_languages.length > 0
+                      ? account.accepted_languages.join(", ")
+                      : "—"
+                  }
+                />
+                {account.lead_notes && (
+                  <div className="sm:col-span-2">
+                    <dt className="text-xs font-medium text-gray-400">Lead Notes</dt>
+                    <dd className="mt-0.5 text-gray-800 whitespace-pre-wrap">{account.lead_notes}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
 
           {/* Generate login link */}
           <div className="space-y-3">
@@ -503,6 +575,15 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     <div>
       <dt className="text-xs font-medium text-gray-400">{label}</dt>
       <dd className="mt-0.5 text-gray-800">{value ?? <span className="text-gray-400 italic">—</span>}</dd>
+    </div>
+  );
+}
+
+function PrefField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium text-gray-400">{label}</dt>
+      <dd className="mt-0.5 text-sm text-gray-800">{value}</dd>
     </div>
   );
 }
