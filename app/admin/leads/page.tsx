@@ -5,37 +5,43 @@ import { useRouter } from "next/navigation";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type LeadStatus = "new" | "reviewing" | "ready_to_match" | "matched" | "closed" | "spam";
+type LeadStatus =
+  | "new"
+  | "reviewing"
+  | "ready_to_assign"
+  | "assigned"
+  | "closed"
+  | "rejected"
+  | "spam";
 
 /** Lightweight row returned by the list endpoint */
 interface LeadRow {
   id: string;
   created_at: string;
   updated_at: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
+  source: string;
+  external_reference_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
   email: string | null;
   city: string | null;
-  state: string;
+  state: string | null;
   zip: string | null;
-  preferred_contact_method: string | null;
-  lives_in_us: boolean | null;
-  age_range: string | null;
   benefit_type: string | null;
   application_status: string | null;
-  has_attorney: string | null;
   status: LeadStatus;
   assigned_partner_account_id: string | null;
-  reviewed_at: string | null;
+  assigned_at: string | null;
 }
 
 /** Full record returned by the detail endpoint */
 interface LeadDetail extends LeadRow {
   medical_summary: string | null;
   additional_notes: string | null;
-  consent_given: boolean;
-  review_notes: string | null;
+  internal_review_notes: string | null;
+  partner_response_status: string | null;
+  raw_payload: Record<string, unknown> | null;
 }
 
 interface PartnerAccount {
@@ -47,24 +53,26 @@ interface PartnerAccount {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const LEAD_STATUS_OPTIONS: LeadStatus[] = [
-  "new", "reviewing", "ready_to_match", "matched", "closed", "spam",
+  "new", "reviewing", "ready_to_assign", "assigned", "closed", "rejected", "spam",
 ];
 
 const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
   new:             "bg-blue-100 text-blue-800",
   reviewing:       "bg-yellow-100 text-yellow-800",
-  ready_to_match:  "bg-purple-100 text-purple-800",
-  matched:         "bg-green-100 text-green-800",
+  ready_to_assign: "bg-purple-100 text-purple-800",
+  assigned:        "bg-green-100 text-green-800",
   closed:          "bg-gray-100 text-gray-600",
+  rejected:        "bg-orange-100 text-orange-700",
   spam:            "bg-red-100 text-red-700",
 };
 
 const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   new:             "New",
   reviewing:       "Reviewing",
-  ready_to_match:  "Ready to Match",
-  matched:         "Matched",
+  ready_to_assign: "Ready to Assign",
+  assigned:        "Assigned",
   closed:          "Closed",
+  rejected:        "Rejected",
   spam:            "Spam",
 };
 
@@ -119,18 +127,19 @@ function LeadDetailModal({
   onClose: () => void;
   onUpdated: (updated: Partial<LeadDetail> & { id: string }) => void;
 }) {
-  const [lead, setLead]               = useState<LeadDetail | null>(null);
+  const [lead, setLead]                   = useState<LeadDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
-  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailError, setDetailError]     = useState<string | null>(null);
+  const [rawExpanded, setRawExpanded]     = useState(false);
 
   // Editable admin fields — initialised once lead loads
-  const [status, setStatus]           = useState<LeadStatus>("new");
-  const [reviewNotes, setReviewNotes] = useState("");
-  const [assignedId, setAssignedId]   = useState("");
+  const [status, setStatus]               = useState<LeadStatus>("new");
+  const [reviewNotes, setReviewNotes]     = useState("");
+  const [assignedId, setAssignedId]       = useState("");
 
-  const [saving, setSaving]           = useState(false);
-  const [saveError, setSaveError]     = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saving, setSaving]               = useState(false);
+  const [saveError, setSaveError]         = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess]     = useState(false);
 
   // Fetch full lead detail on mount
   useEffect(() => {
@@ -149,7 +158,7 @@ function LeadDetailModal({
         const fullLead: LeadDetail = data.data;
         setLead(fullLead);
         setStatus(fullLead.status);
-        setReviewNotes(fullLead.review_notes ?? "");
+        setReviewNotes(fullLead.internal_review_notes ?? "");
         setAssignedId(fullLead.assigned_partner_account_id ?? "");
       })
       .catch(() => {
@@ -170,7 +179,7 @@ function LeadDetailModal({
 
     const payload: Record<string, unknown> = {
       status,
-      review_notes: reviewNotes,
+      internal_review_notes: reviewNotes,
       assigned_partner_account_id: assignedId || null,
     };
 
@@ -195,7 +204,9 @@ function LeadDetailModal({
     }
   }
 
-  const assignedPartner = partners.find((p) => p.id === (assignedId || lead?.assigned_partner_account_id));
+  const assignedPartner = partners.find(
+    (p) => p.id === (assignedId || lead?.assigned_partner_account_id)
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8">
@@ -207,9 +218,11 @@ function LeadDetailModal({
             {lead ? (
               <>
                 <h2 className="text-lg font-bold text-[#0d1b2e]">
-                  {lead.first_name} {lead.last_name}
+                  {lead.first_name || lead.last_name
+                    ? `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim()
+                    : "Unnamed Lead"}
                 </h2>
-                <p className="text-xs text-gray-400 mt-0.5">Submitted {formatDateTime(lead.created_at)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Received {formatDateTime(lead.created_at)}</p>
               </>
             ) : (
               <h2 className="text-lg font-bold text-[#0d1b2e]">Lead Detail</h2>
@@ -246,31 +259,35 @@ function LeadDetailModal({
           {/* Full lead content */}
           {!detailLoading && !detailError && lead && (
             <>
+              {/* Source & Reference */}
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Source Information</h3>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  <DetailField label="Source" value={lead.source} />
+                  <DetailField label="External Reference ID" value={lead.external_reference_id} />
+                </dl>
+              </section>
+
               {/* Contact Info */}
               <section>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Contact Information</h3>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  <DetailField label="First Name" value={lead.first_name} />
+                  <DetailField label="Last Name" value={lead.last_name} />
                   <DetailField label="Phone" value={lead.phone} />
                   <DetailField label="Email" value={lead.email} />
                   <DetailField label="City" value={lead.city} />
                   <DetailField label="State" value={lead.state} />
                   <DetailField label="ZIP" value={lead.zip} />
-                  <DetailField label="Preferred Contact" value={lead.preferred_contact_method} />
                 </dl>
               </section>
 
-              {/* Intake Responses */}
+              {/* Benefit & Application Info */}
               <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Intake Responses</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Benefit Information</h3>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                  <DetailField
-                    label="Lives in U.S."
-                    value={lead.lives_in_us === true ? "Yes" : lead.lives_in_us === false ? "No" : null}
-                  />
-                  <DetailField label="Age Range" value={lead.age_range} />
                   <DetailField label="Benefit Type" value={lead.benefit_type} />
                   <DetailField label="Application Status" value={lead.application_status} />
-                  <DetailField label="Has Attorney" value={lead.has_attorney} />
                 </dl>
               </section>
 
@@ -298,23 +315,28 @@ function LeadDetailModal({
                 )}
               </section>
 
-              {/* Consent Status */}
+              {/* Raw Payload (collapsed by default) */}
               <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Consent</h3>
-                <div className="flex items-center gap-2">
-                  {lead.consent_given ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                      Consent given
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800">
-                      Consent not given
-                    </span>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setRawExpanded((v) => !v)}
+                  className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-400 hover:text-gray-600"
+                >
+                  <svg
+                    className={`h-3.5 w-3.5 transition-transform ${rawExpanded ? "rotate-90" : ""}`}
+                    fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                  Raw Payload (debug / audit)
+                </button>
+                {rawExpanded && (
+                  <pre className="mt-2 overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600 whitespace-pre-wrap break-all">
+                    {lead.raw_payload
+                      ? JSON.stringify(lead.raw_payload, null, 2)
+                      : "(no raw payload stored)"}
+                  </pre>
+                )}
               </section>
 
               {/* Admin Actions */}
@@ -356,11 +378,14 @@ function LeadDetailModal({
                   {assignedPartner && (
                     <p className="mt-1 text-xs text-gray-500">
                       Currently assigned: <strong>{assignedPartner.firm_name}</strong>
+                      {lead.assigned_at && (
+                        <> — assigned {formatDateTime(lead.assigned_at)}</>
+                      )}
                     </p>
                   )}
                 </div>
 
-                {/* Review Notes */}
+                {/* Internal Review Notes */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Internal Review Notes</label>
                   <textarea
@@ -370,9 +395,6 @@ function LeadDetailModal({
                     className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 resize-y focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
                     placeholder="Add internal notes…"
                   />
-                  {lead.reviewed_at && (
-                    <p className="mt-1 text-xs text-gray-400">Last reviewed: {formatDateTime(lead.reviewed_at)}</p>
-                  )}
                 </div>
 
                 {saveError   && <p className="text-xs text-red-600">{saveError}</p>}
@@ -399,19 +421,19 @@ function LeadDetailModal({
 export default function AdminLeadsPage() {
   const router = useRouter();
 
-  const [leads, setLeads]               = useState<LeadRow[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [loadError, setLoadError]       = useState<string | null>(null);
+  const [leads, setLeads]                   = useState<LeadRow[]>([]);
+  const [loading, setLoading]               = useState(true);
+  const [loadError, setLoadError]           = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
   // Partners list for assignment dropdown
-  const [partners, setPartners]         = useState<PartnerAccount[]>([]);
+  const [partners, setPartners]             = useState<PartnerAccount[]>([]);
 
   // Filters
-  const [search, setSearch]             = useState("");
-  const [stateFilter, setStateFilter]   = useState("");
-  const [benefitFilter, setBenefitFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch]                 = useState("");
+  const [stateFilter, setStateFilter]       = useState("");
+  const [benefitFilter, setBenefitFilter]   = useState("");
+  const [statusFilter, setStatusFilter]     = useState("");
   const [assignedFilter, setAssignedFilter] = useState("");
 
   const fetchLeads = useCallback(async () => {
@@ -474,7 +496,7 @@ export default function AdminLeadsPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#0d1b2e]">Lead Queue</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Review submitted claimant intake forms. Manual assignment only — no automatic routing.
+            Leads received from Disability Benefits Screening. Manual assignment only — no automatic routing.
           </p>
         </div>
 
@@ -483,7 +505,7 @@ export default function AdminLeadsPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <input
               type="text"
-              placeholder="Search name, email, phone…"
+              placeholder="Search name, email, phone, ref ID…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c] lg:col-span-2"
@@ -549,29 +571,44 @@ export default function AdminLeadsPage() {
               <table className="w-full text-sm">
                 <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
                   <tr>
-                    <th className="px-4 py-3 text-left">Submitted</th>
+                    <th className="px-4 py-3 text-left">Received</th>
+                    <th className="px-4 py-3 text-left">Source</th>
+                    <th className="px-4 py-3 text-left">Ext. Ref</th>
                     <th className="px-4 py-3 text-left">Name</th>
                     <th className="px-4 py-3 text-left">State</th>
                     <th className="px-4 py-3 text-left">Benefit Type</th>
                     <th className="px-4 py-3 text-left">App. Status</th>
                     <th className="px-4 py-3 text-left">Status</th>
                     <th className="px-4 py-3 text-left">Assigned Partner</th>
-                    <th className="px-4 py-3 text-left">Contact</th>
                     <th className="px-4 py-3 text-left">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {leads.map((lead) => {
-                    const assignedPartner = partners.find((p) => p.id === lead.assigned_partner_account_id);
+                    const assignedPartner = partners.find(
+                      (p) => p.id === lead.assigned_partner_account_id
+                    );
+                    const displayName =
+                      lead.first_name || lead.last_name
+                        ? `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim()
+                        : null;
                     return (
                       <tr key={lead.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">
                           {formatDate(lead.created_at)}
                         </td>
-                        <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
-                          {lead.first_name} {lead.last_name}
+                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                          {lead.source}
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{lead.state}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500 font-mono whitespace-nowrap">
+                          {lead.external_reference_id ?? <span className="italic text-gray-400">—</span>}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                          {displayName ?? <span className="italic text-gray-400">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {lead.state ?? <span className="italic text-gray-400">—</span>}
+                        </td>
                         <td className="px-4 py-3 text-gray-600">
                           {lead.benefit_type ?? <span className="italic text-gray-400">—</span>}
                         </td>
@@ -588,10 +625,6 @@ export default function AdminLeadsPage() {
                           {assignedPartner
                             ? assignedPartner.firm_name
                             : <span className="italic text-gray-400">Unassigned</span>}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-600 space-y-0.5">
-                          <div>{lead.phone}</div>
-                          {lead.email && <div className="text-gray-400">{lead.email}</div>}
                         </td>
                         <td className="px-4 py-3">
                           <button

@@ -2,14 +2,16 @@ import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-const VALID_STATUSES = ["new", "reviewing", "ready_to_match", "matched", "closed", "spam"] as const;
+const VALID_STATUSES = [
+  "new", "reviewing", "ready_to_assign", "assigned", "closed", "rejected", "spam",
+] as const;
 type LeadStatus = typeof VALID_STATUSES[number];
 
 /**
  * GET /api/admin/leads/[id]
  *
  * Returns the full lead record including medical_summary, additional_notes,
- * review_notes, and assigned partner info.
+ * internal_review_notes, raw_payload, and assigned partner info.
  */
 export async function GET(
   _request: Request,
@@ -39,7 +41,7 @@ export async function GET(
  *
  * Allows admin to update:
  *   - status
- *   - review_notes
+ *   - internal_review_notes
  *   - assigned_partner_account_id (set to null to unassign)
  *
  * No automatic routing. No email sending. Manual assignment only.
@@ -68,20 +70,17 @@ export async function PATCH(
     const status = String(body.status ?? "").trim() as LeadStatus;
     if (!VALID_STATUSES.includes(status)) {
       return NextResponse.json(
-        {
-          error: `Invalid status. Allowed values: ${VALID_STATUSES.join(", ")}.`,
-        },
+        { error: `Invalid status. Allowed values: ${VALID_STATUSES.join(", ")}.` },
         { status: 422 }
       );
     }
     updates.status = status;
   }
 
-  // ── Review notes ──────────────────────────────────────────────────────────
-  if ("review_notes" in body) {
-    const notes = String(body.review_notes ?? "").trim();
-    updates.review_notes = notes || null;
-    updates.reviewed_at = new Date().toISOString();
+  // ── Internal review notes ─────────────────────────────────────────────────
+  if ("internal_review_notes" in body) {
+    const notes = String(body.internal_review_notes ?? "").trim();
+    updates.internal_review_notes = notes || null;
   }
 
   // ── Partner assignment ────────────────────────────────────────────────────
@@ -89,6 +88,7 @@ export async function PATCH(
     const partnerId = body.assigned_partner_account_id;
     if (partnerId === null || partnerId === "") {
       updates.assigned_partner_account_id = null;
+      updates.assigned_at = null;
     } else {
       // Verify the partner account exists
       const { data: partner, error: partnerError } = await supabaseAdmin
@@ -104,6 +104,7 @@ export async function PATCH(
         );
       }
       updates.assigned_partner_account_id = String(partnerId);
+      updates.assigned_at = new Date().toISOString();
     }
   }
 
@@ -118,7 +119,9 @@ export async function PATCH(
     .from("leads")
     .update(updates)
     .eq("id", id)
-    .select("id, status, review_notes, assigned_partner_account_id, reviewed_at, updated_at")
+    .select(
+      "id, status, internal_review_notes, assigned_partner_account_id, assigned_at, updated_at"
+    )
     .single();
 
   if (error || !data) {
