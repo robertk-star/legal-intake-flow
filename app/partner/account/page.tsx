@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { getAuthenticatedPartnerId } from "@/lib/partnerAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import Image from "next/image";
 import PartnerLogoutButton from "./LogoutButton";
+import LeadPreferencesForm, { type LeadPreferences } from "./LeadPreferencesForm";
 
 interface PartnerAccount {
   id: string;
@@ -19,20 +19,35 @@ interface PartnerAccount {
   status: string;
   last_login_at: string | null;
   created_at: string;
+  // Preference columns (added in section04 migration)
+  accepting_leads:         boolean | null;
+  lead_status:             string | null;
+  accepted_case_types:     string[] | null;
+  accepted_languages:      string[] | null;
+  accepts_initial_filings: boolean | null;
+  accepts_appeals:         boolean | null;
+  accepts_hearings:        boolean | null;
+  accepts_child_cases:     boolean | null;
+  lead_notes:              string | null;
 }
 
 export default async function PartnerAccountPage() {
-  // Auth check
+  // ── Auth ──────────────────────────────────────────────────────────────────
   const partnerId = await getAuthenticatedPartnerId();
 
   if (!partnerId) {
     redirect("/partner/login");
   }
 
-  // Fetch partner account details
+  // ── Fetch partner account (profile + preferences) ─────────────────────────
   const { data: account, error } = await supabaseAdmin
     .from("partner_accounts")
-    .select("*")
+    .select(
+      "id, firm_name, contact_first_name, contact_last_name, email, phone, website, " +
+      "states_served, practice_area, monthly_lead_capacity, status, last_login_at, created_at, " +
+      "accepting_leads, lead_status, accepted_case_types, accepted_languages, " +
+      "accepts_initial_filings, accepts_appeals, accepts_hearings, accepts_child_cases, lead_notes"
+    )
     .eq("id", partnerId)
     .single();
 
@@ -40,7 +55,21 @@ export default async function PartnerAccountPage() {
     redirect("/partner/login");
   }
 
-  const partner = account as PartnerAccount;
+  const partner = account as unknown as PartnerAccount;
+
+  // ── Build initialPreferences with safe defaults ───────────────────────────
+  const initialPreferences: LeadPreferences = {
+    accepting_leads:         partner.accepting_leads         ?? true,
+    lead_status:             (partner.lead_status as LeadPreferences["lead_status"]) ?? "active",
+    monthly_lead_capacity:   partner.monthly_lead_capacity   ?? "",
+    accepted_case_types:     partner.accepted_case_types     ?? [],
+    accepted_languages:      partner.accepted_languages      ?? [],
+    accepts_initial_filings: partner.accepts_initial_filings ?? true,
+    accepts_appeals:         partner.accepts_appeals         ?? false,
+    accepts_hearings:        partner.accepts_hearings         ?? false,
+    accepts_child_cases:     partner.accepts_child_cases     ?? false,
+    lead_notes:              partner.lead_notes              ?? null,
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -60,9 +89,9 @@ export default async function PartnerAccountPage() {
       </header>
 
       {/* Main content */}
-      <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+      <main className="mx-auto max-w-5xl space-y-8 px-4 py-10 sm:px-6">
         {/* Page heading */}
-        <div className="mb-8">
+        <div>
           <h1 className="text-2xl font-bold text-[#0d1b2e]">Partner Account</h1>
           <p className="mt-1 text-sm text-gray-500">
             Welcome back, {partner.contact_first_name}.
@@ -70,7 +99,7 @@ export default async function PartnerAccountPage() {
         </div>
 
         {/* Coming soon notice */}
-        <div className="mb-8 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4">
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4">
           <p className="text-sm text-blue-800">
             <strong>Lead dashboard is coming soon.</strong>{" "}
             This account is currently used to confirm partner access and profile information.
@@ -139,6 +168,9 @@ export default async function PartnerAccountPage() {
             </dl>
           </div>
         </div>
+
+        {/* Lead Preferences */}
+        <LeadPreferencesForm initialPreferences={initialPreferences} />
       </main>
     </div>
   );
