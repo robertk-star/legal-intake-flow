@@ -119,17 +119,31 @@ function PartnerAccountPanel({
         `/api/admin/partner-requests/${request.id}/create-partner-account`,
         { method: "POST" }
       );
-      const data = (await res.json()) as {
+      let data: {
         success: boolean;
         alreadyExists?: boolean;
         data?: PartnerAccount;
         error?: string;
+        supabaseCode?: string | null;
+        supabaseMessage?: string | null;
+        hint?: string | null;
       };
+      try {
+        data = await res.json();
+      } catch {
+        setCreateError(`Server returned an unexpected response (HTTP ${res.status}). Check server logs.`);
+        setCreating(false);
+        return;
+      }
 
       if (data.success && data.data) {
         setAccount(data.data);
       } else {
-        setCreateError(data.error ?? "Failed to create partner account.");
+        // Build a detailed error string for the admin
+        let msg = data.error ?? "Failed to create partner account.";
+        if (data.supabaseCode) msg += ` [code: ${data.supabaseCode}]`;
+        if (data.hint) msg += ` Hint: ${data.hint}`;
+        setCreateError(msg);
       }
     } catch {
       setCreateError("Network error. Please try again.");
