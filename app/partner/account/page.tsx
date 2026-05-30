@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import {
   getAuthenticatedPartnerSession,
   type PartnerRole,
@@ -121,15 +122,27 @@ export default async function PartnerAccountPage() {
       {/* Header */}
       <header className="border-b border-gray-200 bg-[#0d1b2e]">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
-          <Image
-            src="/images/lif-name-logo.png"
-            alt="Legal Intake Flow"
-            width={180}
-            height={36}
-            className="h-8 w-auto object-contain brightness-0 invert"
-            priority
-          />
-          <PartnerLogoutButton />
+          <div className="flex items-center gap-6">
+            <Image
+              src="/images/lif-name-logo.png"
+              alt="Legal Intake Flow"
+              width={180}
+              height={36}
+              className="h-8 w-auto object-contain brightness-0 invert"
+              priority
+            />
+            <nav className="hidden items-center gap-4 text-sm sm:flex">
+              <Link href="/partner/account" className="font-semibold text-white">
+                Account
+              </Link>
+              <Link href="/partner/leads" className="text-white/70 hover:text-white">
+                Leads
+              </Link>
+            </nav>
+          </div>
+          <div className="flex items-center gap-4">
+            <PartnerLogoutButton />
+          </div>
         </div>
       </header>
 
@@ -163,11 +176,17 @@ export default async function PartnerAccountPage() {
           )}
         </div>
 
-        {/* Coming soon notice */}
+        {/* Lead dashboard notice */}
         <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4">
           <p className="text-sm text-blue-800">
-            <strong>Lead dashboard is coming soon.</strong>{" "}
-            This account is currently used to confirm partner access and profile information.
+            <strong>Lead dashboard is available.</strong>{" "}
+            Review leads that Legal Intake Flow admin has manually assigned to your firm.
+            <a
+              href="/partner/leads"
+              className="ml-1 font-semibold underline underline-offset-2 hover:text-blue-900"
+            >
+              View assigned leads
+            </a>
           </p>
         </div>
 

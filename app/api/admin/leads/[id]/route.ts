@@ -7,11 +7,15 @@ const VALID_STATUSES = [
 ] as const;
 type LeadStatus = typeof VALID_STATUSES[number];
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 /**
  * GET /api/admin/leads/[id]
  *
  * Returns the full lead record including medical_summary, additional_notes,
- * internal_review_notes, raw_payload, and assigned partner info.
+ * internal_review_notes, raw_payload, partner response fields, and assignment info.
  */
 export async function GET(
   _request: Request,
@@ -42,9 +46,10 @@ export async function GET(
  * Allows admin to update:
  *   - status
  *   - internal_review_notes
- *   - assigned_partner_account_id (set to null to unassign)
+ *   - assigned_partner_account_id (manual assignment only)
  *
- * No automatic routing. No email sending. Manual assignment only.
+ * If assignment changes, partner response workflow fields are reset so notes/status
+ * from a prior partner do not carry over to the newly assigned firm.
  */
 export async function PATCH(
   request: Request,
@@ -56,10 +61,14 @@ export async function PATCH(
 
   const { id } = await params;
 
-  let body: Record<string, unknown>;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  if (!isPlainObject(body)) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
@@ -85,16 +94,36 @@ export async function PATCH(
 
   // ── Partner assignment ────────────────────────────────────────────────────
   if ("assigned_partner_account_id" in body) {
+    const { data: currentLead, error: currentLeadError } = await supabaseAdmin
+      .from("leads")
+      .select("id, assigned_partner_account_id")
+      .eq("id", id)
+      .single();
+
+    if (currentLeadError || !currentLead) {
+      return NextResponse.json({ error: "Lead not found." }, { status: 404 });
+    }
+
     const partnerId = body.assigned_partner_account_id;
+    const currentPartnerId = currentLead.assigned_partner_account_id as string | null;
+
     if (partnerId === null || partnerId === "") {
-      updates.assigned_partner_account_id = null;
-      updates.assigned_at = null;
+      if (currentPartnerId !== null) {
+        updates.assigned_partner_account_id = null;
+        updates.assigned_at = null;
+        updates.partner_response_status = null;
+        updates.partner_response_updated_at = null;
+        updates.partner_viewed_at = null;
+        updates.partner_notes = null;
+      }
     } else {
-      // Verify the partner account exists
+      const nextPartnerId = String(partnerId);
+
+      // Verify the partner account exists and is active enough to receive assignments.
       const { data: partner, error: partnerError } = await supabaseAdmin
         .from("partner_accounts")
-        .select("id")
-        .eq("id", String(partnerId))
+        .select("id, status")
+        .eq("id", nextPartnerId)
         .single();
 
       if (partnerError || !partner) {
@@ -103,8 +132,23 @@ export async function PATCH(
           { status: 404 }
         );
       }
-      updates.assigned_partner_account_id = String(partnerId);
-      updates.assigned_at = new Date().toISOString();
+
+      if (partner.status !== "active" && partner.status !== "pending") {
+        return NextResponse.json(
+          { error: "Partner account must be active or pending before assignment." },
+          { status: 422 }
+        );
+      }
+
+      updates.assigned_partner_account_id = nextPartnerId;
+
+      if (currentPartnerId !== nextPartnerId) {
+        updates.assigned_at = new Date().toISOString();
+        updates.partner_response_status = "new";
+        updates.partner_response_updated_at = null;
+        updates.partner_viewed_at = null;
+        updates.partner_notes = null;
+      }
     }
   }
 
@@ -120,7 +164,8 @@ export async function PATCH(
     .update(updates)
     .eq("id", id)
     .select(
-      "id, status, internal_review_notes, assigned_partner_account_id, assigned_at, updated_at"
+      "id, status, internal_review_notes, assigned_partner_account_id, assigned_at, " +
+      "partner_response_status, partner_response_updated_at, partner_viewed_at, partner_notes, updated_at"
     )
     .single();
 

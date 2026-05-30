@@ -57,6 +57,7 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 |---|---|
 | `/partner/login` | One-time token login page — validates token, sets partner session cookie, redirects to account |
 | `/partner/account` | Partner profile page — firm info, account status, signed-in user info |
+| `/partner/leads` | Partner lead dashboard — assigned DBS leads, lead detail, partner response status, partner notes |
 
 ---
 
@@ -100,10 +101,12 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 
 | Route | Method | Description |
 |---|---|---|
-| `/api/partner/login` | `POST` | Validate one-time token, set partner session cookie (30d) |
+| `/api/partner/login` | `GET` | Validate one-time token, set partner session cookie (30d) |
 | `/api/partner/logout` | `POST` | Clear partner session cookie |
 | `/api/partner/request-login` | `POST` | Request a new login link (creates `partner_login_requests` row) |
-| `/api/partner/preferences` | `GET` / `PATCH` | Get or update partner preferences |
+| `/api/partner/preferences` | `PATCH` | Update partner preferences |
+| `/api/partner/leads` | `GET` | List leads assigned to the authenticated partner account |
+| `/api/partner/leads/[id]` | `GET` / `PATCH` | Get assigned lead detail; update partner response status and partner notes |
 
 ---
 
@@ -134,11 +137,12 @@ Run migrations in order against your Supabase project using the SQL Editor.
 | `sql/section01_partner_access_requests.sql` | `partner_access_requests` table |
 | `sql/section02_partner_request_admin_review.sql` | Adds `internal_notes` column, confirms status constraint |
 | `sql/section03_partner_accounts.sql` | `partner_accounts` and `partner_login_tokens` tables |
-| `sql/section04_partner_preferences.sql` | `partner_preferences` table |
+| `sql/section04_partner_preferences.sql` | Adds partner preference columns to `partner_accounts` |
 | `sql/section05_partner_login_requests.sql` | `partner_login_requests` table |
 | `sql/section06_partner_users.sql` | `partner_users` table, backfill owner users, `partner_user_id` on tokens and login requests |
 | `sql/section07_leads.sql` | Initial `public.leads` table (Phase 9 — public intake, now superseded) |
-| `sql/section08_dbs_lead_ingestion.sql` | **Run this.** Adapts `public.leads` for DBS ingestion: adds `source`, `external_reference_id`, `raw_payload`, `internal_review_notes`, `assigned_at`, `partner_response_status`; removes public insert policy; updates status constraint to DBS values; makes contact fields nullable |
+| `sql/section08_dbs_lead_ingestion.sql` | Adapts `public.leads` for DBS ingestion: adds `source`, `external_reference_id`, `raw_payload`, `internal_review_notes`, `assigned_at`, `partner_response_status`; removes public insert policy; updates status constraint to DBS values; makes contact fields nullable |
+| `sql/section09_partner_lead_dashboard.sql` | **Run this for Phase 11.** Adds partner lead workflow fields: `partner_notes`, `partner_response_updated_at`, `partner_viewed_at`; adds valid partner response status constraint and indexes |
 
 > **Note:** `section07_leads.sql` created the initial leads table for a public intake approach that has been superseded. Run `section08_dbs_lead_ingestion.sql` after `section07` (or instead of it on a fresh database) to align the schema with the DBS ingestion architecture.
 
@@ -170,6 +174,34 @@ Content-Type: application/json
 ```
 
 All fields except the secret header are optional. The full incoming JSON is stored in `raw_payload` for audit and debugging. Leads are created with `status = "new"` and no automatic partner assignment.
+
+---
+
+## Partner Lead Dashboard
+
+Admin assigns DBS-sourced leads manually from `/admin/leads`. Assigned leads appear for the partner at `/partner/leads`.
+
+Partner users can:
+
+- view assigned claimant/contact details
+- review benefit/application information
+- update partner response status
+- add partner notes
+
+Partner response statuses:
+
+```
+new
+reviewing
+contact_attempted
+contacted
+accepted
+declined
+retained
+closed
+```
+
+Viewer-role partner users can view assigned leads but cannot update status or notes. No automatic matching, routing, email sending, or billing is included in this phase.
 
 ---
 

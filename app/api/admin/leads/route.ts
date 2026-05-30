@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       "id, created_at, updated_at, source, external_reference_id, " +
       "first_name, last_name, phone, email, city, state, zip, " +
       "benefit_type, application_status, status, " +
-      "assigned_partner_account_id, assigned_at"
+      "assigned_partner_account_id, assigned_at, partner_response_status, partner_response_updated_at"
     )
     .order("created_at", { ascending: false })
     .limit(limit);

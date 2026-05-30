@@ -41,6 +41,9 @@ interface LeadDetail extends LeadRow {
   additional_notes: string | null;
   internal_review_notes: string | null;
   partner_response_status: string | null;
+  partner_notes: string | null;
+  partner_viewed_at: string | null;
+  partner_response_updated_at: string | null;
   raw_payload: Record<string, unknown> | null;
 }
 
@@ -313,6 +316,26 @@ function LeadDetailModal({
                 ) : (
                   <p className="text-sm italic text-gray-400">Not provided.</p>
                 )}
+              </section>
+
+              {/* Partner Response */}
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Partner Response</h3>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  <DetailField label="Partner Status" value={lead.partner_response_status?.replace(/_/g, " ") ?? null} />
+                  <DetailField label="Partner Viewed" value={formatDateTime(lead.partner_viewed_at)} />
+                  <DetailField label="Partner Updated" value={formatDateTime(lead.partner_response_updated_at)} />
+                </dl>
+                <div className="mt-3">
+                  <h4 className="text-xs font-medium uppercase tracking-wider text-gray-400 mb-2">Partner Notes</h4>
+                  {lead.partner_notes ? (
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                      {lead.partner_notes}
+                    </p>
+                  ) : (
+                    <p className="text-sm italic text-gray-400">No partner notes yet.</p>
+                  )}
+                </div>
               </section>
 
               {/* Raw Payload (collapsed by default) */}
