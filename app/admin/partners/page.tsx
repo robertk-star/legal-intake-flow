@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 
 type AccountStatus = "active" | "inactive" | "pending" | "suspended";
 type LeadStatus    = "active" | "paused" | "at_capacity";
+type UserRole      = "owner" | "admin" | "staff" | "viewer";
+type UserStatus    = "active" | "inactive" | "pending" | "suspended";
 
 interface PartnerAccount {
   id: string;
@@ -24,7 +26,7 @@ interface PartnerAccount {
   lead_status: LeadStatus | null;
   last_login_at: string | null;
   created_at: string;
-  // Detail fields (loaded separately)
+  // Detail fields
   internal_notes?: string | null;
   accepted_case_types?: string[] | null;
   accepted_languages?: string[] | null;
@@ -35,18 +37,34 @@ interface PartnerAccount {
   lead_notes?: string | null;
 }
 
+interface PartnerUser {
+  id: string;
+  created_at: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: UserRole;
+  status: UserStatus;
+  last_login_at: string | null;
+  invited_at: string | null;
+  accepted_at: string | null;
+}
+
 interface LoginRequest {
   id: string;
   created_at: string;
   email: string;
   partner_account_id: string | null;
+  partner_user_id: string | null;
   status: "new" | "completed" | "dismissed";
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ACCOUNT_STATUS_OPTIONS: AccountStatus[] = ["active", "inactive", "pending", "suspended"];
-const LEAD_STATUS_OPTIONS: LeadStatus[] = ["active", "paused", "at_capacity"];
+const LEAD_STATUS_OPTIONS: LeadStatus[]        = ["active", "paused", "at_capacity"];
+const USER_ROLE_OPTIONS: UserRole[]            = ["owner", "admin", "staff", "viewer"];
+const USER_STATUS_OPTIONS: UserStatus[]        = ["active", "inactive", "pending", "suspended"];
 
 const ACCOUNT_STATUS_COLORS: Record<AccountStatus, string> = {
   active:    "bg-green-100 text-green-800",
@@ -59,6 +77,13 @@ const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
   active:      "bg-blue-100 text-blue-800",
   paused:      "bg-yellow-100 text-yellow-800",
   at_capacity: "bg-orange-100 text-orange-800",
+};
+
+const USER_STATUS_COLORS: Record<UserStatus, string> = {
+  active:    "bg-green-100 text-green-800",
+  inactive:  "bg-gray-100 text-gray-700",
+  pending:   "bg-yellow-100 text-yellow-800",
+  suspended: "bg-red-100 text-red-800",
 };
 
 const LOGIN_REQUEST_STATUS_COLORS: Record<string, string> = {
@@ -101,6 +126,342 @@ function PrefRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+// ── Add/Edit User Form ────────────────────────────────────────────────────────
+
+function UserForm({
+  partnerAccountId,
+  editUser,
+  onSaved,
+  onCancel,
+}: {
+  partnerAccountId: string;
+  editUser: PartnerUser | null;
+  onSaved: (user: PartnerUser) => void;
+  onCancel: () => void;
+}) {
+  const [firstName, setFirstName] = useState(editUser?.first_name ?? "");
+  const [lastName,  setLastName]  = useState(editUser?.last_name  ?? "");
+  const [email,     setEmail]     = useState(editUser?.email      ?? "");
+  const [role,      setRole]      = useState<UserRole>(editUser?.role ?? "staff");
+  const [status,    setStatus]    = useState<UserStatus>(editUser?.status ?? "pending");
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    try {
+      let res: Response;
+      if (editUser) {
+        res = await fetch(`/api/admin/partner-users/${editUser.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ first_name: firstName, last_name: lastName, role, status }),
+        });
+      } else {
+        res = await fetch(`/api/admin/partners/${partnerAccountId}/users`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ first_name: firstName, last_name: lastName, email, role }),
+        });
+      }
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Failed to save user.");
+        return;
+      }
+      onSaved(data.data as PartnerUser);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+      <h4 className="text-sm font-semibold text-[#0d1b2e]">
+        {editUser ? "Edit Partner User" : "Add Partner User"}
+      </h4>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600">First Name *</label>
+          <input
+            required
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600">Last Name *</label>
+          <input
+            required
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      {!editUser && (
+        <div>
+          <label className="block text-xs font-medium text-gray-600">Email *</label>
+          <input
+            required
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-600">Role *</label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as UserRole)}
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            {USER_ROLE_OPTIONS.map((r) => (
+              <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+            ))}
+          </select>
+        </div>
+        {editUser && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600">Status</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as UserStatus)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {USER_STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-lg bg-[#1a3a5c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0d1b2e] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saving ? "Saving…" : editUser ? "Save Changes" : "Add User"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── Partner Users Section ─────────────────────────────────────────────────────
+
+function PartnerUsersSection({ partnerAccountId }: { partnerAccountId: string }) {
+  const [users, setUsers]             = useState<PartnerUser[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [loadError, setLoadError]     = useState<string | null>(null);
+  const [showForm, setShowForm]       = useState(false);
+  const [editingUser, setEditingUser] = useState<PartnerUser | null>(null);
+
+  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [loginLinks, setLoginLinks]       = useState<Record<string, { url: string; expiry: string }>>({});
+  const [copiedUserId, setCopiedUserId]   = useState<string | null>(null);
+  const [linkErrors, setLinkErrors]       = useState<Record<string, string>>({});
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetch(`/api/admin/partners/${partnerAccountId}/users`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setLoadError(data.error ?? "Failed to load users."); return; }
+      setUsers(data.data ?? []);
+    } catch {
+      setLoadError("Network error.");
+    } finally {
+      setLoading(false);
+    }
+  }, [partnerAccountId]);
+
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  function handleUserSaved(user: PartnerUser) {
+    setUsers((prev) => {
+      const idx = prev.findIndex((u) => u.id === user.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = user;
+        return next;
+      }
+      return [...prev, user];
+    });
+    setShowForm(false);
+    setEditingUser(null);
+  }
+
+  async function handleGenerateLink(userId: string) {
+    setGeneratingFor(userId);
+    setLinkErrors((prev) => ({ ...prev, [userId]: "" }));
+    try {
+      const res = await fetch(`/api/admin/partner-users/${userId}/generate-login-link`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLinkErrors((prev) => ({ ...prev, [userId]: data.error ?? "Failed to generate link." }));
+        return;
+      }
+      setLoginLinks((prev) => ({
+        ...prev,
+        [userId]: { url: data.loginUrl, expiry: data.expiresAt },
+      }));
+    } finally {
+      setGeneratingFor(null);
+    }
+  }
+
+  function handleCopyLink(userId: string) {
+    const link = loginLinks[userId];
+    if (!link) return;
+    navigator.clipboard.writeText(link.url).then(() => {
+      setCopiedUserId(userId);
+      setTimeout(() => setCopiedUserId(null), 3000);
+    });
+  }
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Partner Users</h3>
+        {!showForm && !editingUser && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="rounded-lg border border-[#1a3a5c] px-3 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white"
+          >
+            + Add User
+          </button>
+        )}
+      </div>
+
+      {showForm && !editingUser && (
+        <div className="mb-4">
+          <UserForm
+            partnerAccountId={partnerAccountId}
+            editUser={null}
+            onSaved={handleUserSaved}
+            onCancel={() => setShowForm(false)}
+          />
+        </div>
+      )}
+
+      {loading ? (
+        <p className="text-sm text-gray-400">Loading users…</p>
+      ) : loadError ? (
+        <p className="text-sm text-red-500">{loadError}</p>
+      ) : users.length === 0 ? (
+        <p className="text-sm text-gray-400">No users yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {users.map((user) => (
+            <div key={user.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+              {editingUser?.id === user.id ? (
+                <UserForm
+                  partnerAccountId={partnerAccountId}
+                  editUser={editingUser}
+                  onSaved={handleUserSaved}
+                  onCancel={() => setEditingUser(null)}
+                />
+              ) : (
+                <>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-semibold text-[#0d1b2e]">
+                        {user.first_name} {user.last_name}
+                      </p>
+                      <p className="text-xs text-gray-500">{user.email}</p>
+                      <div className="flex items-center gap-2 pt-1">
+                        <Badge label={user.role} colorClass="bg-indigo-100 text-indigo-800" />
+                        <Badge
+                          label={user.status}
+                          colorClass={USER_STATUS_COLORS[user.status] ?? "bg-gray-100 text-gray-700"}
+                        />
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right space-y-0.5">
+                      <p className="text-xs text-gray-400">Last login: {formatDate(user.last_login_at)}</p>
+                      <p className="text-xs text-gray-400">Invited: {formatDate(user.invited_at)}</p>
+                      <p className="text-xs text-gray-400">Accepted: {formatDate(user.accepted_at)}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => setEditingUser(user)}
+                      className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleGenerateLink(user.id)}
+                      disabled={generatingFor === user.id}
+                      className="rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white disabled:opacity-50"
+                    >
+                      {generatingFor === user.id ? "Generating…" : "Generate Login Link"}
+                    </button>
+                  </div>
+
+                  {linkErrors[user.id] && (
+                    <p className="text-xs text-red-600">{linkErrors[user.id]}</p>
+                  )}
+
+                  {loginLinks[user.id] && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-1.5">
+                      <p className="text-xs font-semibold text-amber-800">
+                        One-time link — show once. Expires {formatDate(loginLinks[user.id].expiry)}.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          readOnly
+                          value={loginLinks[user.id].url}
+                          className="flex-1 truncate rounded border border-gray-300 bg-white px-2 py-1 text-xs font-mono text-gray-700"
+                        />
+                        <button
+                          onClick={() => handleCopyLink(user.id)}
+                          className="shrink-0 rounded bg-[#1a3a5c] px-3 py-1 text-xs font-semibold text-white hover:bg-[#0d1b2e]"
+                        >
+                          {copiedUserId === user.id ? "Copied ✓" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ── Detail Modal ──────────────────────────────────────────────────────────────
 
 function PartnerDetailModal({
@@ -118,7 +479,6 @@ function PartnerDetailModal({
   const [saveError, setSaveError]     = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Login link state
   const [generatingLink, setGeneratingLink] = useState(false);
   const [loginUrl, setLoginUrl]             = useState<string | null>(null);
   const [loginExpiry, setLoginExpiry]       = useState<string | null>(null);
@@ -150,7 +510,7 @@ function PartnerDetailModal({
     }
   }
 
-  async function handleGenerateLink() {
+  async function handleGenerateAccountLink() {
     setGeneratingLink(true);
     setLinkError(null);
     setLoginUrl(null);
@@ -184,13 +544,17 @@ function PartnerDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8">
       <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <div>
             <h2 className="text-lg font-bold text-[#0d1b2e]">{partner.firm_name}</h2>
-            <p className="text-sm text-gray-500">{partner.contact_first_name} {partner.contact_last_name} · {partner.email}</p>
+            <p className="text-sm text-gray-500">
+              {partner.contact_first_name} {partner.contact_last_name} · {partner.email}
+            </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -198,24 +562,24 @@ function PartnerDetailModal({
         </div>
 
         <div className="space-y-6 px-6 py-6">
-          {/* ── Profile ── */}
+          {/* Profile */}
           <section>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Profile</h3>
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-              <PrefRow label="Firm Name"          value={partner.firm_name} />
-              <PrefRow label="Contact Name"       value={`${partner.contact_first_name} ${partner.contact_last_name}`} />
-              <PrefRow label="Email"              value={partner.email} />
-              <PrefRow label="Phone"              value={partner.phone} />
-              <PrefRow label="Website"            value={partner.website} />
-              <PrefRow label="States Served"      value={partner.states_served} />
-              <PrefRow label="Practice Area"      value={partner.practice_area} />
-              <PrefRow label="Monthly Capacity"   value={partner.monthly_lead_capacity} />
-              <PrefRow label="Last Login"         value={formatDateTime(partner.last_login_at)} />
-              <PrefRow label="Created"            value={formatDate(partner.created_at)} />
+              <PrefRow label="Firm Name"        value={partner.firm_name} />
+              <PrefRow label="Contact Name"     value={`${partner.contact_first_name} ${partner.contact_last_name}`} />
+              <PrefRow label="Email"            value={partner.email} />
+              <PrefRow label="Phone"            value={partner.phone} />
+              <PrefRow label="Website"          value={partner.website} />
+              <PrefRow label="States Served"    value={partner.states_served} />
+              <PrefRow label="Practice Area"    value={partner.practice_area} />
+              <PrefRow label="Monthly Capacity" value={partner.monthly_lead_capacity} />
+              <PrefRow label="Last Login"       value={formatDateTime(partner.last_login_at)} />
+              <PrefRow label="Created"          value={formatDate(partner.created_at)} />
             </div>
           </section>
 
-          {/* ── Account Settings ── */}
+          {/* Account Settings */}
           <section>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Account Settings</h3>
             <div className="space-y-4">
@@ -241,7 +605,7 @@ function PartnerDetailModal({
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
-              {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+              {saveError   && <p className="text-sm text-red-600">{saveError}</p>}
               {saveSuccess && <p className="text-sm text-green-600">Changes saved.</p>}
               <button
                 onClick={handleSave}
@@ -253,31 +617,39 @@ function PartnerDetailModal({
             </div>
           </section>
 
-          {/* ── Lead Preferences (read-only) ── */}
+          {/* Lead Preferences (read-only) */}
           <section>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Lead Preferences</h3>
             <div className="space-y-2">
-              <PrefRow label="Accepting Leads"    value={partner.accepting_leads == null ? "—" : partner.accepting_leads ? "Yes" : "No"} />
-              <PrefRow label="Lead Status"        value={partner.lead_status ?? "—"} />
-              <PrefRow label="Benefit Programs"   value={(partner.accepted_case_types ?? []).join(", ") || "—"} />
-              <PrefRow label="Initial Filings"    value={partner.accepts_initial_filings == null ? "—" : partner.accepts_initial_filings ? "Yes" : "No"} />
-              <PrefRow label="Appeals"            value={partner.accepts_appeals == null ? "—" : partner.accepts_appeals ? "Yes" : "No"} />
-              <PrefRow label="Hearings"           value={partner.accepts_hearings == null ? "—" : partner.accepts_hearings ? "Yes" : "No"} />
-              <PrefRow label="Child Disability"   value={partner.accepts_child_cases == null ? "—" : partner.accepts_child_cases ? "Yes" : "No"} />
-              <PrefRow label="Languages"          value={(partner.accepted_languages ?? []).join(", ") || "—"} />
-              <PrefRow label="Lead Notes"         value={partner.lead_notes ?? "—"} />
+              <PrefRow label="Accepting Leads"  value={partner.accepting_leads == null ? "—" : partner.accepting_leads ? "Yes" : "No"} />
+              <PrefRow label="Lead Status"      value={partner.lead_status ?? "—"} />
+              <PrefRow label="Benefit Programs" value={(partner.accepted_case_types ?? []).join(", ") || "—"} />
+              <PrefRow label="Initial Filings"  value={partner.accepts_initial_filings == null ? "—" : partner.accepts_initial_filings ? "Yes" : "No"} />
+              <PrefRow label="Appeals"          value={partner.accepts_appeals == null ? "—" : partner.accepts_appeals ? "Yes" : "No"} />
+              <PrefRow label="Hearings"         value={partner.accepts_hearings == null ? "—" : partner.accepts_hearings ? "Yes" : "No"} />
+              <PrefRow label="Child Disability" value={partner.accepts_child_cases == null ? "—" : partner.accepts_child_cases ? "Yes" : "No"} />
+              <PrefRow label="Languages"        value={(partner.accepted_languages ?? []).join(", ") || "—"} />
+              <PrefRow label="Lead Notes"       value={partner.lead_notes ?? "—"} />
             </div>
           </section>
 
-          {/* ── Login Access ── */}
+          {/* Partner Users */}
+          <PartnerUsersSection partnerAccountId={partner.id} />
+
+          {/* Account-Level Login Link (legacy) */}
           <section>
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Login Access</h3>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+              Account-Level Login Link
+              <span className="ml-2 text-xs font-normal normal-case text-gray-400">
+                (use user login links above when possible)
+              </span>
+            </h3>
             <button
-              onClick={handleGenerateLink}
+              onClick={handleGenerateAccountLink}
               disabled={generatingLink}
               className="rounded-lg border border-[#1a3a5c] px-4 py-2 text-sm font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {generatingLink ? "Generating…" : "Generate New Login Link"}
+              {generatingLink ? "Generating…" : "Generate Account Login Link"}
             </button>
 
             {linkError && <p className="mt-2 text-sm text-red-600">{linkError}</p>}
@@ -314,23 +686,26 @@ function PartnerDetailModal({
 export default function AdminPartnersPage() {
   const router = useRouter();
 
-  // Partners list state
-  const [partners, setPartners]           = useState<PartnerAccount[]>([]);
-  const [loading, setLoading]             = useState(true);
-  const [loadError, setLoadError]         = useState<string | null>(null);
-  const [search, setSearch]               = useState("");
-  const [statusFilter, setStatusFilter]   = useState("");
+  const [partners, setPartners]                 = useState<PartnerAccount[]>([]);
+  const [loading, setLoading]                   = useState(true);
+  const [loadError, setLoadError]               = useState<string | null>(null);
+  const [search, setSearch]                     = useState("");
+  const [statusFilter, setStatusFilter]         = useState("");
   const [leadStatusFilter, setLeadStatusFilter] = useState("");
   const [acceptingFilter, setAcceptingFilter]   = useState("");
   const [selectedPartner, setSelectedPartner]   = useState<PartnerAccount | null>(null);
 
-  // Login requests state
   const [loginRequests, setLoginRequests]       = useState<LoginRequest[]>([]);
   const [loginReqLoading, setLoginReqLoading]   = useState(true);
   const [loginReqError, setLoginReqError]       = useState<string | null>(null);
   const [updatingReqId, setUpdatingReqId]       = useState<string | null>(null);
 
-  // ── Fetch partners ────────────────────────────────────────────────────────
+  // Per-request user login link generation
+  const [reqLinkGenerating, setReqLinkGenerating] = useState<string | null>(null);
+  const [reqLinks, setReqLinks]                   = useState<Record<string, { url: string; expiry: string }>>({});
+  const [reqLinkErrors, setReqLinkErrors]         = useState<Record<string, string>>({});
+  const [reqLinkCopied, setReqLinkCopied]         = useState<string | null>(null);
+
   const fetchPartners = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
@@ -355,7 +730,6 @@ export default function AdminPartnersPage() {
 
   useEffect(() => { fetchPartners(); }, [fetchPartners]);
 
-  // ── Fetch login requests ──────────────────────────────────────────────────
   const fetchLoginRequests = useCallback(async () => {
     setLoginReqLoading(true);
     setLoginReqError(null);
@@ -374,7 +748,6 @@ export default function AdminPartnersPage() {
 
   useEffect(() => { fetchLoginRequests(); }, [fetchLoginRequests]);
 
-  // ── Update login request status ───────────────────────────────────────────
   async function updateLoginRequestStatus(id: string, status: "completed" | "dismissed") {
     setUpdatingReqId(id);
     try {
@@ -393,30 +766,52 @@ export default function AdminPartnersPage() {
     }
   }
 
-  // ── Open detail with full data ────────────────────────────────────────────
   async function openDetail(partner: PartnerAccount) {
     setSelectedPartner(partner);
-    // Fetch full detail (includes preference fields)
     try {
       const res = await fetch(`/api/admin/partners/${partner.id}`);
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.data) {
-        setSelectedPartner(data.data as PartnerAccount);
-      }
+      if (res.ok && data.data) setSelectedPartner(data.data as PartnerAccount);
     } catch {
-      // Use list data as fallback
+      // use list data as fallback
     }
   }
 
-  // ── Generate login link from login request ────────────────────────────────
-  async function generateLinkFromRequest(req: LoginRequest) {
+  async function generateUserLinkForRequest(req: LoginRequest) {
+    if (!req.partner_user_id) return;
+    const userId = req.partner_user_id;
+    setReqLinkGenerating(req.id);
+    setReqLinkErrors((prev) => ({ ...prev, [req.id]: "" }));
+    try {
+      const res = await fetch(`/api/admin/partner-users/${userId}/generate-login-link`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setReqLinkErrors((prev) => ({ ...prev, [req.id]: data.error ?? "Failed to generate link." }));
+        return;
+      }
+      setReqLinks((prev) => ({ ...prev, [req.id]: { url: data.loginUrl, expiry: data.expiresAt } }));
+    } finally {
+      setReqLinkGenerating(null);
+    }
+  }
+
+  function copyReqLink(reqId: string) {
+    const link = reqLinks[reqId];
+    if (!link) return;
+    navigator.clipboard.writeText(link.url).then(() => {
+      setReqLinkCopied(reqId);
+      setTimeout(() => setReqLinkCopied(null), 3000);
+    });
+  }
+
+  async function openDetailFromRequest(req: LoginRequest) {
     if (!req.partner_account_id) return;
-    // Open the partner detail modal for that account
     const found = partners.find((p) => p.id === req.partner_account_id);
     if (found) {
       openDetail(found);
     } else {
-      // Fetch and open
       try {
         const res = await fetch(`/api/admin/partners/${req.partner_account_id}`);
         const data = await res.json().catch(() => ({}));
@@ -429,7 +824,6 @@ export default function AdminPartnersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Admin nav */}
       <nav className="border-b border-gray-200 bg-white px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
@@ -444,13 +838,12 @@ export default function AdminPartnersPage() {
       </nav>
 
       <main className="mx-auto max-w-7xl px-4 py-8 space-y-8">
-        {/* ── Page header ── */}
         <div>
           <h1 className="text-2xl font-bold text-[#0d1b2e]">Partner Accounts</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage all approved partner accounts.</p>
+          <p className="mt-1 text-sm text-gray-500">Manage all approved partner accounts and their users.</p>
         </div>
 
-        {/* ── Search + Filters ── */}
+        {/* Search + Filters */}
         <div className="flex flex-wrap gap-3">
           <input
             type="text"
@@ -496,7 +889,7 @@ export default function AdminPartnersPage() {
           </button>
         </div>
 
-        {/* ── Partners Table ── */}
+        {/* Partners Table */}
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-16 text-sm text-gray-400">Loading…</div>
@@ -565,14 +958,11 @@ export default function AdminPartnersPage() {
           )}
         </div>
 
-        {/* ── Recent Login Requests ── */}
+        {/* Recent Login Requests */}
         <section>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-bold text-[#0d1b2e]">Recent Login Requests</h2>
-            <button
-              onClick={fetchLoginRequests}
-              className="text-xs text-blue-600 hover:underline"
-            >
+            <button onClick={fetchLoginRequests} className="text-xs text-blue-600 hover:underline">
               Refresh
             </button>
           </div>
@@ -591,6 +981,7 @@ export default function AdminPartnersPage() {
                     <tr>
                       <th className="px-4 py-3 text-left">Email</th>
                       <th className="px-4 py-3 text-left">Requested</th>
+                      <th className="px-4 py-3 text-left">Matched</th>
                       <th className="px-4 py-3 text-left">Status</th>
                       <th className="px-4 py-3 text-left">Actions</th>
                     </tr>
@@ -600,6 +991,13 @@ export default function AdminPartnersPage() {
                       <tr key={req.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-700">{req.email}</td>
                         <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDateTime(req.created_at)}</td>
+                        <td className="px-4 py-3 text-xs">
+                          {req.partner_user_id
+                            ? <span className="text-green-700 font-medium">User matched</span>
+                            : req.partner_account_id
+                              ? <span className="text-yellow-700">Account only</span>
+                              : <span className="text-gray-400">No match</span>}
+                        </td>
                         <td className="px-4 py-3">
                           <Badge
                             label={req.status}
@@ -607,32 +1005,70 @@ export default function AdminPartnersPage() {
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {req.partner_account_id && (
-                              <button
-                                onClick={() => generateLinkFromRequest(req)}
-                                className="rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white"
-                              >
-                                Generate Link
-                              </button>
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* User-matched: generate user-specific link directly */}
+                              {req.partner_user_id && (
+                                <button
+                                  onClick={() => generateUserLinkForRequest(req)}
+                                  disabled={reqLinkGenerating === req.id}
+                                  className="rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white disabled:opacity-50"
+                                >
+                                  {reqLinkGenerating === req.id ? "Generating…" : "Generate User Link"}
+                                </button>
+                              )}
+                              {/* Open account (always shown when account is known) */}
+                              {req.partner_account_id && (
+                                <button
+                                  onClick={() => openDetailFromRequest(req)}
+                                  className="rounded border border-gray-400 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-100"
+                                >
+                                  Open Account
+                                </button>
+                              )}
+                              {req.status !== "completed" && (
+                                <button
+                                  onClick={() => updateLoginRequestStatus(req.id, "completed")}
+                                  disabled={updatingReqId === req.id}
+                                  className="rounded border border-green-600 px-2 py-1 text-xs font-semibold text-green-700 hover:bg-green-600 hover:text-white disabled:opacity-50"
+                                >
+                                  Mark Complete
+                                </button>
+                              )}
+                              {req.status !== "dismissed" && (
+                                <button
+                                  onClick={() => updateLoginRequestStatus(req.id, "dismissed")}
+                                  disabled={updatingReqId === req.id}
+                                  className="rounded border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+                                >
+                                  Dismiss
+                                </button>
+                              )}
+                            </div>
+                            {/* Inline error for link generation */}
+                            {reqLinkErrors[req.id] && (
+                              <p className="text-xs text-red-600">{reqLinkErrors[req.id]}</p>
                             )}
-                            {req.status !== "completed" && (
-                              <button
-                                onClick={() => updateLoginRequestStatus(req.id, "completed")}
-                                disabled={updatingReqId === req.id}
-                                className="rounded border border-green-600 px-2 py-1 text-xs font-semibold text-green-700 hover:bg-green-600 hover:text-white disabled:opacity-50"
-                              >
-                                Mark Complete
-                              </button>
-                            )}
-                            {req.status !== "dismissed" && (
-                              <button
-                                onClick={() => updateLoginRequestStatus(req.id, "dismissed")}
-                                disabled={updatingReqId === req.id}
-                                className="rounded border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-100 disabled:opacity-50"
-                              >
-                                Dismiss
-                              </button>
+                            {/* Generated user link — show once */}
+                            {reqLinks[req.id] && (
+                              <div className="rounded border border-amber-200 bg-amber-50 p-2 space-y-1">
+                                <p className="text-xs font-semibold text-amber-800">
+                                  One-time link — expires {formatDate(reqLinks[req.id].expiry)}
+                                </p>
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    readOnly
+                                    value={reqLinks[req.id].url}
+                                    className="flex-1 truncate rounded border border-gray-300 bg-white px-2 py-1 text-xs font-mono text-gray-700"
+                                  />
+                                  <button
+                                    onClick={() => copyReqLink(req.id)}
+                                    className="shrink-0 rounded bg-[#1a3a5c] px-2 py-1 text-xs font-semibold text-white hover:bg-[#0d1b2e]"
+                                  >
+                                    {reqLinkCopied === req.id ? "Copied ✓" : "Copy"}
+                                  </button>
+                                </div>
+                              </div>
                             )}
                           </div>
                         </td>
@@ -646,7 +1082,6 @@ export default function AdminPartnersPage() {
         </section>
       </main>
 
-      {/* Detail Modal */}
       {selectedPartner && (
         <PartnerDetailModal
           partner={selectedPartner}

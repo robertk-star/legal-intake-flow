@@ -7,18 +7,26 @@ export const PARTNER_COOKIE_NAME = "lif_partner_session";
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 export const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60;
 
+export type PartnerRole = "owner" | "admin" | "staff" | "viewer";
+
+export interface PartnerSession {
+  partnerAccountId: string;
+  partnerUserId: string;
+  role: PartnerRole;
+  issuedAt: number;
+  expiresAt: number;
+}
+
 // ── Signing secret ────────────────────────────────────────────────────────────
 // Server-only. Never referenced in client components.
 
 function getSigningSecret(): string {
   const secret = process.env.LIF_PARTNER_SESSION_SECRET;
-
   if (!secret) {
     throw new Error(
       "[partnerAuth] Missing environment variable: LIF_PARTNER_SESSION_SECRET"
     );
   }
-
   return secret;
 }
 
@@ -53,63 +61,88 @@ async function hmacVerify(
 }
 
 // ── Token format ──────────────────────────────────────────────────────────────
-// <partnerAccountId>.<issuedAt>.<expiresAt>.<signature>
-// partnerAccountId is a UUID (no dots), issuedAt and expiresAt are ms timestamps.
+//
+// Format (dot-separated):
+//   <partnerAccountId>|<partnerUserId>|<role>.<issuedAt>.<expiresAt>.<signature>
+//
+// The first segment uses "|" as an internal separator (no dots) so the outer
+// split-on-"." always yields exactly 4 parts.
+//
+// partnerAccountId and partnerUserId are UUIDs (contain hyphens but no dots).
+// role is a short string with no dots.
+// issuedAt and expiresAt are ms timestamps.
 
-async function createToken(partnerAccountId: string): Promise<string> {
+async function createToken(session: Omit<PartnerSession, "issuedAt" | "expiresAt">): Promise<string> {
   const secret = getSigningSecret();
   const issuedAt = Date.now();
   const expiresAt = issuedAt + THIRTY_DAYS_MS;
-  const payload = `${partnerAccountId}.${issuedAt}.${expiresAt}`;
+  const dataPart = `${session.partnerAccountId}|${session.partnerUserId}|${session.role}`;
+  const payload = `${dataPart}.${issuedAt}.${expiresAt}`;
   const signature = await hmacSign(payload, secret);
   return `${payload}.${signature}`;
 }
 
-interface VerifiedPartnerToken {
-  partnerAccountId: string;
-  issuedAt: number;
-  expiresAt: number;
-}
-
-async function verifyToken(token: string): Promise<VerifiedPartnerToken | null> {
-  // Format: <uuid>.<issuedAt>.<expiresAt>.<signature>
-  // UUID has 4 dashes but we split on "." so we need exactly 4 parts
+async function verifyToken(token: string): Promise<PartnerSession | null> {
+  // Split on "." — expect exactly 4 parts
   const parts = token.split(".");
   if (parts.length !== 4) return null;
 
-  const [partnerAccountId, issuedAtStr, expiresAtStr, signature] = parts;
+  const [dataPart, issuedAtStr, expiresAtStr, signature] = parts;
   const issuedAt = parseInt(issuedAtStr, 10);
   const expiresAt = parseInt(expiresAtStr, 10);
 
-  if (!partnerAccountId || isNaN(issuedAt) || isNaN(expiresAt)) return null;
+  if (!dataPart || isNaN(issuedAt) || isNaN(expiresAt)) return null;
 
   // Check expiration
   if (Date.now() > expiresAt) return null;
 
   // Verify signature
   const secret = getSigningSecret();
-  const payload = `${partnerAccountId}.${issuedAtStr}.${expiresAtStr}`;
+  const payload = `${dataPart}.${issuedAtStr}.${expiresAtStr}`;
   const valid = await hmacVerify(payload, signature, secret);
   if (!valid) return null;
 
-  return { partnerAccountId, issuedAt, expiresAt };
+  // Parse the data part: <accountId>|<userId>|<role>
+  const segments = dataPart.split("|");
+  if (segments.length !== 3) return null;
+  const [partnerAccountId, partnerUserId, role] = segments;
+  if (!partnerAccountId || !partnerUserId || !role) return null;
+
+  return {
+    partnerAccountId,
+    partnerUserId,
+    role: role as PartnerRole,
+    issuedAt,
+    expiresAt,
+  };
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Create a signed 30-day partner session token for the given partner account ID.
+ * Create a signed 30-day partner session token containing account ID, user ID, and role.
  */
-export async function createPartnerSessionToken(partnerAccountId: string): Promise<string> {
-  return createToken(partnerAccountId);
+export async function createPartnerSessionToken(
+  partnerAccountId: string,
+  partnerUserId: string,
+  role: PartnerRole
+): Promise<string> {
+  return createToken({ partnerAccountId, partnerUserId, role });
 }
 
 /**
  * Verify the partner session cookie server-side.
- * Checks: format, signature, expiration, account exists, account status is active or pending.
- * Returns the partner account ID if valid, or null if invalid/expired/inactive.
+ *
+ * Checks:
+ *   - Token format and signature
+ *   - Token not expired
+ *   - Partner account exists and status is active or pending
+ *   - Partner user exists and status is active or pending
+ *   - Partner user belongs to the partner account
+ *
+ * Returns the full PartnerSession if valid, or null if any check fails.
  */
-export async function getAuthenticatedPartnerId(): Promise<string | null> {
+export async function getAuthenticatedPartnerSession(): Promise<PartnerSession | null> {
   try {
     const cookieStore = await cookies();
     const session = cookieStore.get(PARTNER_COOKIE_NAME);
@@ -118,20 +151,47 @@ export async function getAuthenticatedPartnerId(): Promise<string | null> {
     const verified = await verifyToken(session.value);
     if (!verified) return null;
 
-    // Confirm account still exists and is in an allowed status
-    const { data, error } = await supabaseAdmin
+    // Confirm partner account exists and is in an allowed status
+    const { data: account, error: accountError } = await supabaseAdmin
       .from("partner_accounts")
       .select("id, status")
       .eq("id", verified.partnerAccountId)
       .single();
 
-    if (error || !data) return null;
-    if (data.status !== "active" && data.status !== "pending") return null;
+    if (accountError || !account) return null;
+    if (account.status !== "active" && account.status !== "pending") return null;
 
-    return data.id as string;
+    // Confirm partner user exists, belongs to this account, and is in an allowed status
+    const { data: user, error: userError } = await supabaseAdmin
+      .from("partner_users")
+      .select("id, partner_account_id, role, status")
+      .eq("id", verified.partnerUserId)
+      .single();
+
+    if (userError || !user) return null;
+    if (user.partner_account_id !== verified.partnerAccountId) return null;
+    if (user.status !== "active" && user.status !== "pending") return null;
+
+    // Return verified session (use DB role as authoritative source)
+    return {
+      partnerAccountId: account.id as string,
+      partnerUserId: user.id as string,
+      role: user.role as PartnerRole,
+      issuedAt: verified.issuedAt,
+      expiresAt: verified.expiresAt,
+    };
   } catch {
     return null;
   }
+}
+
+/**
+ * Convenience helper — returns the partner account ID from the verified session,
+ * or null if the session is invalid. Used by routes that only need the account ID.
+ */
+export async function getAuthenticatedPartnerId(): Promise<string | null> {
+  const session = await getAuthenticatedPartnerSession();
+  return session?.partnerAccountId ?? null;
 }
 
 /**

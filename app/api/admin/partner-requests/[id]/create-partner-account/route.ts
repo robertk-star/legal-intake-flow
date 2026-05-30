@@ -149,6 +149,49 @@ export async function POST(
     );
   }
 
+  // ── Create initial owner partner_users row ──────────────────────────────────
+  // Idempotent: skip if a user with this email already exists for the account.
+  const { data: existingUser } = await supabaseAdmin
+    .from("partner_users")
+    .select("id")
+    .eq("partner_account_id", (account as { id: string }).id)
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (!existingUser) {
+    const now = new Date().toISOString();
+    const { error: userInsertError } = await supabaseAdmin
+      .from("partner_users")
+      .insert({
+        partner_account_id: (account as { id: string }).id,
+        email:              normalizedEmail,
+        first_name:         (req.first_name as string).trim(),
+        last_name:          (req.last_name as string).trim(),
+        role:               "owner",
+        status:             "active",
+        invited_at:         now,
+        accepted_at:        now,
+      });
+
+    if (userInsertError) {
+      // Non-fatal: account was created successfully; log and surface a warning.
+      // The admin can add the user manually from the partner accounts dashboard.
+      console.warn(
+        "[create-partner-account] Partner account created but initial owner user insert failed:",
+        userInsertError
+      );
+      return NextResponse.json({
+        success: true,
+        alreadyExists: false,
+        data: account,
+        warning:
+          "Partner account created, but the initial owner user could not be created automatically. " +
+          `Database error [${userInsertError.code ?? "unknown"}]: ${userInsertError.message ?? "no message"}. ` +
+          "Please add the owner user manually from the Partner Accounts dashboard.",
+      });
+    }
+  }
+
   return NextResponse.json({
     success: true,
     alreadyExists: false,

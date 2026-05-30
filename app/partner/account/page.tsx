@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
-import { getAuthenticatedPartnerId } from "@/lib/partnerAuth";
+import {
+  getAuthenticatedPartnerSession,
+  type PartnerRole,
+} from "@/lib/partnerAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import Image from "next/image";
 import PartnerLogoutButton from "./LogoutButton";
@@ -19,7 +22,6 @@ interface PartnerAccount {
   status: string;
   last_login_at: string | null;
   created_at: string;
-  // Preference columns (added in section04 migration)
   accepting_leads:         boolean | null;
   lead_status:             string | null;
   accepted_case_types:     string[] | null;
@@ -31,16 +33,44 @@ interface PartnerAccount {
   lead_notes:              string | null;
 }
 
+interface PartnerUser {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: PartnerRole;
+  status: string;
+  last_login_at: string | null;
+}
+
+// ── Role badge helper ─────────────────────────────────────────────────────────
+
+const ROLE_COLORS: Record<PartnerRole, string> = {
+  owner:  "bg-purple-100 text-purple-800",
+  admin:  "bg-indigo-100 text-indigo-800",
+  staff:  "bg-blue-100 text-blue-800",
+  viewer: "bg-gray-100 text-gray-700",
+};
+
+const ROLE_LABELS: Record<PartnerRole, string> = {
+  owner:  "Owner",
+  admin:  "Admin",
+  staff:  "Staff",
+  viewer: "Viewer",
+};
+
 export default async function PartnerAccountPage() {
   // ── Auth ──────────────────────────────────────────────────────────────────
-  const partnerId = await getAuthenticatedPartnerId();
+  const session = await getAuthenticatedPartnerSession();
 
-  if (!partnerId) {
+  if (!session) {
     redirect("/partner/login");
   }
 
+  const { partnerAccountId, partnerUserId, role } = session;
+
   // ── Fetch partner account (profile + preferences) ─────────────────────────
-  const { data: account, error } = await supabaseAdmin
+  const { data: account, error: accountError } = await supabaseAdmin
     .from("partner_accounts")
     .select(
       "id, firm_name, contact_first_name, contact_last_name, email, phone, website, " +
@@ -48,14 +78,23 @@ export default async function PartnerAccountPage() {
       "accepting_leads, lead_status, accepted_case_types, accepted_languages, " +
       "accepts_initial_filings, accepts_appeals, accepts_hearings, accepts_child_cases, lead_notes"
     )
-    .eq("id", partnerId)
+    .eq("id", partnerAccountId)
     .single();
 
-  if (error || !account) {
+  if (accountError || !account) {
     redirect("/partner/login");
   }
 
   const partner = account as unknown as PartnerAccount;
+
+  // ── Fetch signed-in partner user ──────────────────────────────────────────
+  const { data: partnerUser } = await supabaseAdmin
+    .from("partner_users")
+    .select("id, first_name, last_name, email, role, status, last_login_at")
+    .eq("id", partnerUserId)
+    .single();
+
+  const user = partnerUser as PartnerUser | null;
 
   // ── Build initialPreferences with safe defaults ───────────────────────────
   const initialPreferences: LeadPreferences = {
@@ -66,10 +105,16 @@ export default async function PartnerAccountPage() {
     accepted_languages:      partner.accepted_languages      ?? [],
     accepts_initial_filings: partner.accepts_initial_filings ?? true,
     accepts_appeals:         partner.accepts_appeals         ?? false,
-    accepts_hearings:        partner.accepts_hearings         ?? false,
+    accepts_hearings:        partner.accepts_hearings        ?? false,
     accepts_child_cases:     partner.accepts_child_cases     ?? false,
     lead_notes:              partner.lead_notes              ?? null,
   };
+
+  // Display name: prefer user record, fall back to account contact name
+  const displayFirstName = user?.first_name ?? partner.contact_first_name;
+  const displayFullName  = user
+    ? `${user.first_name} ${user.last_name}`
+    : `${partner.contact_first_name} ${partner.contact_last_name}`;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -91,11 +136,31 @@ export default async function PartnerAccountPage() {
       {/* Main content */}
       <main className="mx-auto max-w-5xl space-y-8 px-4 py-10 sm:px-6">
         {/* Page heading */}
-        <div>
-          <h1 className="text-2xl font-bold text-[#0d1b2e]">Partner Account</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Welcome back, {partner.contact_first_name}.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-[#0d1b2e]">Partner Account</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Welcome back, {displayFirstName}.
+            </p>
+          </div>
+
+          {/* Signed-in user badge */}
+          {user && (
+            <div className="shrink-0 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm text-right">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Signed in as</p>
+              <p className="mt-0.5 text-sm font-semibold text-[#0d1b2e]">{displayFullName}</p>
+              <p className="text-xs text-gray-500">{user.email}</p>
+              <div className="mt-1.5 flex justify-end">
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    ROLE_COLORS[role] ?? "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {ROLE_LABELS[role] ?? role}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Coming soon notice */}

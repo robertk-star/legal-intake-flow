@@ -5,7 +5,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 /**
  * GET /api/admin/login-requests
  *
- * Returns recent partner login requests.
+ * Returns recent partner login requests, including partner_user_id so the admin
+ * UI can distinguish between user-matched, account-only, and unmatched requests.
  * Supports:
  *   ?status=<new|completed|dismissed>  — filter by status
  *   ?limit=<n>                         — max results (default 50, max 200)
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
 
   let query = supabaseAdmin
     .from("partner_login_requests")
-    .select("id, created_at, email, partner_account_id, status")
+    .select("id, created_at, email, partner_account_id, partner_user_id, status")
     .order("created_at", { ascending: false })
     .limit(limit);
 
