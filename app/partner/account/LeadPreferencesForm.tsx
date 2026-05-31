@@ -8,6 +8,7 @@ export interface LeadPreferences {
   accepting_leads:         boolean;
   lead_status:             "active" | "paused" | "at_capacity";
   monthly_lead_capacity:   string;
+  routing_states:          string[];
   accepted_case_types:     string[];
   accepted_languages:      string[];
   accepts_initial_filings: boolean;
@@ -36,6 +37,17 @@ const LEAD_STATUS_OPTIONS = [
   { value: "at_capacity", label: "At Capacity" },
 ] as const;
 
+function normalizeRoutingStates(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[,;\n|/]+/)
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LeadPreferencesForm({
@@ -45,10 +57,15 @@ export default function LeadPreferencesForm({
 }) {
   const [prefs, setPrefs] = useState<LeadPreferences>({
     ...initialPreferences,
+    routing_states:      initialPreferences.routing_states      ?? [],
     accepted_case_types: initialPreferences.accepted_case_types ?? [],
     accepted_languages:  initialPreferences.accepted_languages  ?? [],
     lead_notes:          initialPreferences.lead_notes          ?? "",
   });
+
+  const [routingStatesText, setRoutingStatesText] = useState(
+    (initialPreferences.routing_states ?? []).join(", ")
+  );
 
   const [saving,  setSaving]  = useState(false);
   const [success, setSuccess] = useState(false);
@@ -88,6 +105,7 @@ export default function LeadPreferencesForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...prefs,
+          routing_states: normalizeRoutingStates(routingStatesText),
           lead_notes: prefs.lead_notes?.trim() || null,
         }),
       });
@@ -189,6 +207,29 @@ export default function LeadPreferencesForm({
               />
             </div>
           </div>
+        </fieldset>
+
+        {/* ── Routing States ───────────────────────────────────────────────── */}
+        <fieldset>
+          <legend className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
+            States Accepted for Routing
+          </legend>
+          <p className="text-xs text-gray-500 mb-3">
+            Enter two-letter state abbreviations separated by commas. These are used for admin routing previews before automatic routing is built.
+          </p>
+          <input
+            type="text"
+            value={routingStatesText}
+            onChange={(e) => {
+              setRoutingStatesText(e.target.value);
+              setSuccess(false);
+            }}
+            placeholder="e.g. TX, FL, GA"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800 shadow-sm placeholder:text-gray-400 focus:border-[#1a3a8f] focus:outline-none focus:ring-1 focus:ring-[#1a3a8f]"
+          />
+          <p className="mt-1.5 text-xs text-gray-500">
+            Current routing states: {normalizeRoutingStates(routingStatesText).join(", ") || "None configured"}
+          </p>
         </fieldset>
 
         {/* ── Case Types (SSDI / SSI) ──────────────────────────────────────── */}

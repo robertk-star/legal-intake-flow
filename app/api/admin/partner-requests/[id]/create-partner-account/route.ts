@@ -2,6 +2,17 @@ import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
+function normalizeRoutingStates(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[,;\n|/\s]+/)
+        .map((state) => state.trim().toUpperCase())
+        .filter((state) => /^[A-Z]{2}$/.test(state))
+    )
+  );
+}
+
 /**
  * POST /api/admin/partner-requests/[id]/create-partner-account
  *
@@ -121,6 +132,7 @@ export async function POST(
       phone:                 (req.phone as string).trim(),
       website:               req.website ? (req.website as string).trim() : null,
       states_served:         (req.states_served as string).trim(),
+      routing_states:        normalizeRoutingStates(req.states_served as string),
       practice_area:         (req.practice_area as string).trim(),
       monthly_lead_capacity: (req.monthly_lead_capacity as string).trim(),
       status:                "active",

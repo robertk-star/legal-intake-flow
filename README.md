@@ -96,6 +96,7 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 | `/api/admin/leads` | `GET` | List DBS-ingested leads — supports `search`, `state`, `benefit_type`, `status`, `assigned`, `limit` |
 | `/api/admin/leads/[id]` | `GET` | Get full lead detail including `raw_payload` |
 | `/api/admin/leads/[id]` | `PATCH` | Update `status`, `internal_review_notes`, `assigned_partner_account_id` |
+| `/api/admin/leads/[id]/eligible-partners` | `GET` | Routing eligibility preview for manual assignment — state, benefit, stage, capacity, and accepting-leads checks |
 
 ### Partner
 
@@ -143,6 +144,7 @@ Run migrations in order against your Supabase project using the SQL Editor.
 | `sql/section07_leads.sql` | Initial `public.leads` table (Phase 9 — public intake, now superseded) |
 | `sql/section08_dbs_lead_ingestion.sql` | Adapts `public.leads` for DBS ingestion: adds `source`, `external_reference_id`, `raw_payload`, `internal_review_notes`, `assigned_at`, `partner_response_status`; removes public insert policy; updates status constraint to DBS values; makes contact fields nullable |
 | `sql/section09_partner_lead_dashboard.sql` | **Run this for Phase 11.** Adds partner lead workflow fields: `partner_notes`, `partner_response_updated_at`, `partner_viewed_at`; adds valid partner response status constraint and indexes |
+| `sql/section10_partner_routing_rules.sql` | **Run this for Phase 12.** Adds structured `routing_states`, routing timestamps/notes, backfills from `states_served`, and adds indexes for routing eligibility previews |
 
 > **Note:** `section07_leads.sql` created the initial leads table for a public intake approach that has been superseded. Run `section08_dbs_lead_ingestion.sql` after `section07` (or instead of it on a fresh database) to align the schema with the DBS ingestion architecture.
 
@@ -176,6 +178,23 @@ Content-Type: application/json
 All fields except the secret header are optional. The full incoming JSON is stored in `raw_payload` for audit and debugging. Leads are created with `status = "new"` and no automatic partner assignment.
 
 ---
+
+
+## Partner Routing Rules & Eligibility Preview
+
+Phase 12 prepares the data and admin workflow needed before automatic routing. Partners can now maintain structured **States Accepted for Routing** on `/partner/account`. The admin lead detail modal shows a **Routing Eligibility Preview** for each lead, ranking partners by manual-routing readiness.
+
+Eligibility checks include:
+
+- partner account status is active
+- partner is accepting leads
+- partner lead status is active
+- lead state matches partner routing states
+- benefit type matches accepted programs (`SSDI`, `SSI`)
+- application stage matches accepted stages (`initial`, `appeal`, `hearing`)
+- current-month assignments are below the parsed monthly capacity
+
+This preview is informational only. Admin must still manually choose a partner and click **Save Changes**. No automatic matching or routing is included in Phase 12.
 
 ## Partner Lead Dashboard
 

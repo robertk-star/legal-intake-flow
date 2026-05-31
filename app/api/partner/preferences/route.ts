@@ -18,6 +18,14 @@ const VALID_CASE_TYPES = [
 
 const VALID_LANGUAGES = ["English", "Spanish"] as const;
 
+function normalizeRoutingState(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toUpperCase();
+  if (!normalized) return null;
+  if (!/^[A-Z]{2}$/.test(normalized)) return null;
+  return normalized;
+}
+
 // ── PATCH /api/partner/preferences ────────────────────────────────────────────
 
 /**
@@ -74,6 +82,21 @@ export async function PATCH(request: NextRequest) {
     errors.push("monthly_lead_capacity must be a non-empty string.");
   }
 
+  // routing_states — array of two-letter state abbreviations (can be empty)
+  let routingStates: string[] = [];
+  if (!Array.isArray(raw.routing_states)) {
+    errors.push("routing_states must be an array.");
+  } else {
+    const normalized = (raw.routing_states as unknown[])
+      .map(normalizeRoutingState)
+      .filter((value): value is string => Boolean(value));
+    const invalidCount = (raw.routing_states as unknown[]).length - normalized.length;
+    if (invalidCount > 0) {
+      errors.push("routing_states must contain only two-letter state abbreviations.");
+    }
+    routingStates = Array.from(new Set(normalized));
+  }
+
   // accepted_case_types — array of valid strings (can be empty)
   if (!Array.isArray(raw.accepted_case_types)) {
     errors.push("accepted_case_types must be an array.");
@@ -127,6 +150,7 @@ export async function PATCH(request: NextRequest) {
     accepting_leads:         raw.accepting_leads as boolean,
     lead_status:             raw.lead_status as LeadStatus,
     monthly_lead_capacity:   (raw.monthly_lead_capacity as string).trim(),
+    routing_states:          routingStates,
     accepted_case_types:     raw.accepted_case_types as string[],
     accepted_languages:      raw.accepted_languages as string[],
     accepts_initial_filings: raw.accepts_initial_filings as boolean,
@@ -144,7 +168,7 @@ export async function PATCH(request: NextRequest) {
     .update(update)
     .eq("id", partnerId)
     .select(
-      "id, accepting_leads, lead_status, monthly_lead_capacity, " +
+      "id, accepting_leads, lead_status, monthly_lead_capacity, routing_states, " +
       "accepted_case_types, accepted_languages, " +
       "accepts_initial_filings, accepts_appeals, accepts_hearings, accepts_child_cases, " +
       "lead_notes"

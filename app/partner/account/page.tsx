@@ -20,6 +20,7 @@ interface PartnerAccount {
   states_served: string;
   practice_area: string;
   monthly_lead_capacity: string;
+  routing_states: string[] | null;
   status: string;
   last_login_at: string | null;
   created_at: string;
@@ -75,7 +76,7 @@ export default async function PartnerAccountPage() {
     .from("partner_accounts")
     .select(
       "id, firm_name, contact_first_name, contact_last_name, email, phone, website, " +
-      "states_served, practice_area, monthly_lead_capacity, status, last_login_at, created_at, " +
+      "states_served, practice_area, monthly_lead_capacity, routing_states, status, last_login_at, created_at, " +
       "accepting_leads, lead_status, accepted_case_types, accepted_languages, " +
       "accepts_initial_filings, accepts_appeals, accepts_hearings, accepts_child_cases, lead_notes"
     )
@@ -102,6 +103,7 @@ export default async function PartnerAccountPage() {
     accepting_leads:         partner.accepting_leads         ?? true,
     lead_status:             (partner.lead_status as LeadPreferences["lead_status"]) ?? "active",
     monthly_lead_capacity:   partner.monthly_lead_capacity   ?? "",
+    routing_states:          partner.routing_states          ?? [],
     accepted_case_types:     partner.accepted_case_types     ?? [],
     accepted_languages:      partner.accepted_languages      ?? [],
     accepts_initial_filings: partner.accepts_initial_filings ?? true,

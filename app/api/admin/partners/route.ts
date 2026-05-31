@@ -38,6 +38,7 @@ export async function GET(request: Request) {
       states_served,
       practice_area,
       monthly_lead_capacity,
+      routing_states,
       status,
       accepting_leads,
       lead_status,

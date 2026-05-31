@@ -21,6 +21,7 @@ interface PartnerAccount {
   states_served: string | null;
   practice_area: string | null;
   monthly_lead_capacity: string | null;
+  routing_states?: string[] | null;
   status: AccountStatus;
   accepting_leads: boolean | null;
   lead_status: LeadStatus | null;
@@ -572,6 +573,7 @@ function PartnerDetailModal({
               <PrefRow label="Phone"            value={partner.phone} />
               <PrefRow label="Website"          value={partner.website} />
               <PrefRow label="States Served"    value={partner.states_served} />
+              <PrefRow label="Routing States"   value={(partner.routing_states ?? []).join(", ") || "—"} />
               <PrefRow label="Practice Area"    value={partner.practice_area} />
               <PrefRow label="Monthly Capacity" value={partner.monthly_lead_capacity} />
               <PrefRow label="Last Login"       value={formatDateTime(partner.last_login_at)} />
@@ -623,6 +625,7 @@ function PartnerDetailModal({
             <div className="space-y-2">
               <PrefRow label="Accepting Leads"  value={partner.accepting_leads == null ? "—" : partner.accepting_leads ? "Yes" : "No"} />
               <PrefRow label="Lead Status"      value={partner.lead_status ?? "—"} />
+              <PrefRow label="Routing States"   value={(partner.routing_states ?? []).join(", ") || "—"} />
               <PrefRow label="Benefit Programs" value={(partner.accepted_case_types ?? []).join(", ") || "—"} />
               <PrefRow label="Initial Filings"  value={partner.accepts_initial_filings == null ? "—" : partner.accepts_initial_filings ? "Yes" : "No"} />
               <PrefRow label="Appeals"          value={partner.accepts_appeals == null ? "—" : partner.accepts_appeals ? "Yes" : "No"} />
