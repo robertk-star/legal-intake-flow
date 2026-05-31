@@ -160,6 +160,13 @@ const TABLE_PROBES: TableProbe[] = [
     required: true,
   },
   {
+    key: "partner_billing_disputes",
+    label: "Partner billing disputes",
+    table: "partner_billing_disputes",
+    select: "id, partner_account_id, invoice_id, reason, status, created_at",
+    required: true,
+  },
+  {
     key: "email_notifications",
     label: "Email notification log",
     table: "email_notifications",

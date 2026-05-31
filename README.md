@@ -705,3 +705,29 @@ Partners can see invoice due date and reminder count on:
 ### No new Vercel ENV
 
 No new Vercel environment variable is required for Phase 22 if Phase 14 email is already configured.
+
+## Phase 23 — Partner Invoice Disputes & Admin Resolution
+
+Phase 23 adds a structured billing review workflow. Partners can submit questions or disputes from `/partner/invoices`, and admins can review and resolve them at `/admin/billing/disputes`.
+
+### New routes
+
+- `POST /api/partner/invoices/[id]/disputes` — partner creates an invoice-level billing review request.
+- `GET /api/partner/invoice-disputes` — partner sees their own invoice disputes.
+- `GET /api/admin/billing/disputes` — admin list of billing disputes.
+- `PATCH /api/admin/billing/disputes/[id]` — admin updates dispute status and resolution notes.
+- `/admin/billing/disputes` — admin dispute review dashboard.
+
+### New SQL migration
+
+Run this before testing Phase 23:
+
+```text
+sql/section17_invoice_disputes.sql
+```
+
+This creates `partner_billing_disputes` and updates invoice event logging to allow `dispute_updated` events.
+
+### Phase 23 exclusions
+
+Phase 23 does not add Stripe, payment processing, automatic credits, automatic balance adjustments, public LIF intake, or DBS frontend code.

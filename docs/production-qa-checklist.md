@@ -169,3 +169,15 @@ No Stripe, payment processing, automatic invoice emails, or automatic charges sh
 10. Confirm due date and reminder count are visible.
 
 No Stripe, payment links, payment processing, automatic charges, public LIF intake, or DBS frontend code should be present.
+
+## Phase 23 — Invoice Disputes QA
+
+1. Run `sql/section17_invoice_disputes.sql` in Supabase.
+2. Log in as a partner and open `/partner/invoices`.
+3. Click `Question` on an invoice.
+4. Submit a billing review request with a reason and details.
+5. Confirm the request appears in the partner invoice dispute summary.
+6. Log in as admin and open `/admin/billing/disputes`.
+7. Open the dispute, set status to `in_review`, and save resolution notes.
+8. Set status to `resolved` or `declined` and confirm the partner can see the admin response.
+9. Confirm no invoice balance changes automatically.
