@@ -94,7 +94,7 @@ const TABLE_PROBES: TableProbe[] = [
     key: "partner_users",
     label: "Partner users",
     table: "partner_users",
-    select: "id, partner_account_id, email, role, status",
+    select: "id, partner_account_id, email, role, status, invite_email_sent_at, invite_email_count",
     required: true,
   },
   {

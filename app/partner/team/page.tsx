@@ -1,13 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  getAuthenticatedPartnerSession,
-  type PartnerRole,
-} from "@/lib/partnerAuth";
+import { getAuthenticatedPartnerSession, type PartnerRole } from "@/lib/partnerAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import PartnerLogoutButton from "../account/LogoutButton";
-import PartnerLeadsDashboard from "./PartnerLeadsDashboard";
+import PartnerTeamDashboard from "./PartnerTeamDashboard";
 
 interface PartnerAccountHeader {
   id: string;
@@ -36,12 +33,9 @@ const ROLE_COLORS: Record<PartnerRole, string> = {
   viewer: "bg-gray-100 text-gray-700",
 };
 
-export default async function PartnerLeadsPage() {
+export default async function PartnerTeamPage() {
   const session = await getAuthenticatedPartnerSession();
-
-  if (!session) {
-    redirect("/partner/login");
-  }
+  if (!session) redirect("/partner/login");
 
   const { data: account, error: accountError } = await supabaseAdmin
     .from("partner_accounts")
@@ -49,9 +43,7 @@ export default async function PartnerLeadsPage() {
     .eq("id", session.partnerAccountId)
     .single();
 
-  if (accountError || !account) {
-    redirect("/partner/login");
-  }
+  if (accountError || !account) redirect("/partner/login");
 
   const { data: user } = await supabaseAdmin
     .from("partner_users")
@@ -79,21 +71,11 @@ export default async function PartnerLeadsPage() {
               priority
             />
             <nav className="hidden items-center gap-4 text-sm sm:flex">
-              <Link href="/partner/account" className="text-white/70 hover:text-white">
-                Account
-              </Link>
-              <Link href="/partner/leads" className="font-semibold text-white">
-                Leads
-              </Link>
-              <Link href="/partner/billing" className="text-white/70 hover:text-white">
-                Billing
-              </Link>
-              <Link href="/partner/invoices" className="text-white/70 hover:text-white">
-                Invoices
-              </Link>
-              <Link href="/partner/team" className="text-white/70 hover:text-white">
-                Team
-              </Link>
+              <Link href="/partner/account" className="text-white/70 hover:text-white">Account</Link>
+              <Link href="/partner/leads" className="text-white/70 hover:text-white">Leads</Link>
+              <Link href="/partner/billing" className="text-white/70 hover:text-white">Billing</Link>
+              <Link href="/partner/invoices" className="text-white/70 hover:text-white">Invoices</Link>
+              <Link href="/partner/team" className="font-semibold text-white">Team</Link>
             </nav>
           </div>
           <PartnerLogoutButton />
@@ -103,18 +85,18 @@ export default async function PartnerLeadsPage() {
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-10 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#0d1b2e]">Assigned Leads</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Review DBS leads manually assigned to {partnerAccount.firm_name}.
+            <p className="text-sm font-semibold uppercase tracking-wide text-[#1a3a5c]">Partner Team</p>
+            <h1 className="mt-1 text-2xl font-bold text-[#0d1b2e]">{partnerAccount.firm_name}</h1>
+            <p className="mt-2 max-w-3xl text-sm text-gray-500">
+              Manage the users who can access this partner account. Owners and admins can invite team members and update roles.
             </p>
           </div>
-
           {partnerUser && (
-            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm sm:text-right">
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right shadow-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Signed in as</p>
               <p className="mt-0.5 text-sm font-semibold text-[#0d1b2e]">{displayName}</p>
               <p className="text-xs text-gray-500">{partnerUser.email}</p>
-              <div className="mt-1.5 flex sm:justify-end">
+              <div className="mt-1.5 flex justify-end">
                 <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${ROLE_COLORS[session.role]}`}>
                   {ROLE_LABELS[session.role]}
                 </span>
@@ -123,13 +105,7 @@ export default async function PartnerLeadsPage() {
           )}
         </div>
 
-        {session.role === "viewer" && (
-          <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-5 py-4 text-sm text-yellow-800">
-            Your role is Viewer. You can review assigned leads, but you cannot update lead status or partner notes.
-          </div>
-        )}
-
-        <PartnerLeadsDashboard role={session.role} />
+        <PartnerTeamDashboard role={session.role} currentUserId={session.partnerUserId} />
       </main>
     </div>
   );

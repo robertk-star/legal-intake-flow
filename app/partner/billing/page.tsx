@@ -91,6 +91,9 @@ export default async function PartnerBillingPage() {
               <Link href="/partner/invoices" className="text-white/70 hover:text-white">
                 Invoices
               </Link>
+              <Link href="/partner/team" className="text-white/70 hover:text-white">
+                Team
+              </Link>
             </nav>
           </div>
           <PartnerLogoutButton />

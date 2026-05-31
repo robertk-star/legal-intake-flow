@@ -181,3 +181,24 @@ No Stripe, payment links, payment processing, automatic charges, public LIF inta
 7. Open the dispute, set status to `in_review`, and save resolution notes.
 8. Set status to `resolved` or `declined` and confirm the partner can see the admin response.
 9. Confirm no invoice balance changes automatically.
+
+## Phase 24 — Partner Team Management QA
+
+Required setup:
+
+- Run `sql/section18_partner_team_management.sql` in Supabase.
+- No new Vercel environment variable is required.
+- Invitation emails require the existing email setup: `RESEND_API_KEY` and `LIF_EMAIL_FROM`.
+
+Test checklist:
+
+1. Log in as a partner owner/admin.
+2. Open `/partner/team`.
+3. Confirm existing partner users display.
+4. Add a pending staff user.
+5. Send invitation.
+6. Confirm the invitation sends or returns a copyable one-time login link if email is skipped.
+7. Open the invite link in an incognito window and confirm the new user can log in.
+8. Confirm owner/admin can edit role/status.
+9. Confirm staff/viewer users can view the team list but cannot add/edit/send invitations.
+10. Confirm the system prevents removing the last active/pending owner.

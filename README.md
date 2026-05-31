@@ -731,3 +731,38 @@ This creates `partner_billing_disputes` and updates invoice event logging to all
 ### Phase 23 exclusions
 
 Phase 23 does not add Stripe, payment processing, automatic credits, automatic balance adjustments, public LIF intake, or DBS frontend code.
+
+## Phase 24 — Partner Team Management & User Invitations
+
+Phase 24 adds partner-side team management.
+
+New partner page:
+
+| Route | Purpose |
+|---|---|
+| `/partner/team` | Partner owners/admins manage firm users and send invitations |
+
+New partner API routes:
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/partner/team` | `GET` | List team users for the logged-in partner account |
+| `/api/partner/team` | `POST` | Add a team user to the logged-in partner account |
+| `/api/partner/team/[id]` | `PATCH` | Update a team user's name, role, or status |
+| `/api/partner/team/[id]/send-invite` | `POST` | Generate a one-time login link and send a team invitation email |
+
+SQL migration:
+
+| File | Purpose |
+|---|---|
+| `sql/section18_partner_team_management.sql` | Adds partner user invite tracking fields |
+
+Notes:
+
+- Owners can add/edit any role.
+- Partner admins can add/edit staff and viewer users only.
+- Staff/viewer users can view the team list but cannot manage users.
+- The system keeps at least one active or pending owner on each partner account.
+- Invitation emails use the existing Resend setup from Phase 14.
+- If email is not configured, the invite route returns the one-time login link so it can be copied manually.
+- No Stripe, payment processing, public LIF intake, or DBS frontend code is added.

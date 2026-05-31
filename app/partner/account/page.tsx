@@ -146,6 +146,9 @@ export default async function PartnerAccountPage() {
               <Link href="/partner/invoices" className="text-white/70 hover:text-white">
                 Invoices
               </Link>
+              <Link href="/partner/team" className="text-white/70 hover:text-white">
+                Team
+              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-4">
