@@ -96,7 +96,8 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 | `/api/admin/leads` | `GET` | List DBS-ingested leads — supports `search`, `state`, `benefit_type`, `status`, `assigned`, `limit` |
 | `/api/admin/leads/[id]` | `GET` | Get full lead detail including `raw_payload` |
 | `/api/admin/leads/[id]` | `PATCH` | Update `status`, `internal_review_notes`, `assigned_partner_account_id` |
-| `/api/admin/leads/[id]/eligible-partners` | `GET` | Routing eligibility preview for manual assignment — state, benefit, stage, capacity, and accepting-leads checks |
+| `/api/admin/leads/[id]/eligible-partners` | `GET` | Routing eligibility preview — state, benefit, stage, capacity, and accepting-leads checks |
+| `/api/admin/leads/[id]/assign-best-match` | `POST` | Admin-triggered assignment engine — assigns the highest-scoring eligible partner and records an assignment event |
 
 ### Partner
 
@@ -145,6 +146,7 @@ Run migrations in order against your Supabase project using the SQL Editor.
 | `sql/section08_dbs_lead_ingestion.sql` | Adapts `public.leads` for DBS ingestion: adds `source`, `external_reference_id`, `raw_payload`, `internal_review_notes`, `assigned_at`, `partner_response_status`; removes public insert policy; updates status constraint to DBS values; makes contact fields nullable |
 | `sql/section09_partner_lead_dashboard.sql` | **Run this for Phase 11.** Adds partner lead workflow fields: `partner_notes`, `partner_response_updated_at`, `partner_viewed_at`; adds valid partner response status constraint and indexes |
 | `sql/section10_partner_routing_rules.sql` | **Run this for Phase 12.** Adds structured `routing_states`, routing timestamps/notes, backfills from `states_served`, and adds indexes for routing eligibility previews |
+| `sql/section11_lead_assignment_engine.sql` | **Run this for Phase 13.** Adds `lead_assignment_events` audit table for manual, best-match, and reassignment events |
 
 > **Note:** `section07_leads.sql` created the initial leads table for a public intake approach that has been superseded. Run `section08_dbs_lead_ingestion.sql` after `section07` (or instead of it on a fresh database) to align the schema with the DBS ingestion architecture.
 
@@ -195,6 +197,22 @@ Eligibility checks include:
 - current-month assignments are below the parsed monthly capacity
 
 This preview is informational only. Admin must still manually choose a partner and click **Save Changes**. No automatic matching or routing is included in Phase 12.
+
+## Lead Assignment Engine
+
+Phase 13 adds an admin-triggered assignment engine. The same routing evaluator used for the preview is now reusable in `lib/leadRouting.ts`. In `/admin/leads`, admins can click **Assign Best Match** inside a lead detail modal.
+
+The button:
+
+- chooses the highest-scoring eligible partner
+- assigns the lead to that partner
+- sets lead status to `assigned`
+- sets `assigned_at` for new assignments/reassignments
+- initializes `partner_response_status = new`
+- clears prior partner response fields when reassigned to a different firm
+- writes an audit row to `lead_assignment_events` when the Phase 13 migration has been run
+
+Manual assignment remains available. Phase 13 does **not** automatically assign leads when DBS ingests them, and it does **not** send notifications.
 
 ## Partner Lead Dashboard
 

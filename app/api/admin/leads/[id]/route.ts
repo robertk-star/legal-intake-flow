@@ -73,6 +73,12 @@ export async function PATCH(
   }
 
   const updates: Record<string, unknown> = {};
+  let assignmentEvent: {
+    partnerAccountId: string;
+    previousPartnerAccountId: string | null;
+    assignmentType: "manual" | "reassignment";
+    notes: string;
+  } | null = null;
 
   // ── Status ────────────────────────────────────────────────────────────────
   if ("status" in body) {
@@ -148,6 +154,12 @@ export async function PATCH(
         updates.partner_response_updated_at = null;
         updates.partner_viewed_at = null;
         updates.partner_notes = null;
+        assignmentEvent = {
+          partnerAccountId: nextPartnerId,
+          previousPartnerAccountId: currentPartnerId,
+          assignmentType: currentPartnerId ? "reassignment" : "manual",
+          notes: currentPartnerId ? "Manual admin reassignment." : "Manual admin assignment.",
+        };
       }
     }
   }
@@ -172,6 +184,24 @@ export async function PATCH(
   if (error || !data) {
     console.error("[PATCH /api/admin/leads/[id]] Update error:", error);
     return NextResponse.json({ error: "Failed to update lead." }, { status: 500 });
+  }
+
+  if (assignmentEvent) {
+    const { error: eventError } = await supabaseAdmin
+      .from("lead_assignment_events")
+      .insert({
+        lead_id: id,
+        partner_account_id: assignmentEvent.partnerAccountId,
+        previous_partner_account_id: assignmentEvent.previousPartnerAccountId,
+        assignment_type: assignmentEvent.assignmentType,
+        assigned_by: "admin",
+        notes: assignmentEvent.notes,
+      });
+
+    if (eventError) {
+      // The lead update succeeded; surface only in logs so the admin workflow is not blocked.
+      console.error("[PATCH /api/admin/leads/[id]] Assignment event insert error:", eventError);
+    }
   }
 
   return NextResponse.json({ success: true, data });

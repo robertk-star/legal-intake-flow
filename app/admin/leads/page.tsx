@@ -167,6 +167,9 @@ function LeadDetailModal({
   const [saving, setSaving]               = useState(false);
   const [saveError, setSaveError]         = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess]     = useState(false);
+  const [assigningBest, setAssigningBest] = useState(false);
+  const [bestMatchError, setBestMatchError] = useState<string | null>(null);
+  const [bestMatchSuccess, setBestMatchSuccess] = useState<string | null>(null);
 
   // Fetch full lead detail on mount
   useEffect(() => {
@@ -198,7 +201,7 @@ function LeadDetailModal({
     return () => { cancelled = true; };
   }, [leadId]);
 
-  // Fetch routing eligibility preview for this lead. This is informational only; assignment remains manual.
+  // Fetch routing eligibility preview for this lead. Assignments remain admin-triggered; no automatic routing runs on ingest.
   useEffect(() => {
     let cancelled = false;
     setEligibilityLoading(true);
@@ -257,9 +260,44 @@ function LeadDetailModal({
     }
   }
 
+  async function handleAssignBestMatch() {
+    if (!lead) return;
+    setAssigningBest(true);
+    setBestMatchError(null);
+    setBestMatchSuccess(null);
+
+    try {
+      const res = await fetch(`/api/admin/leads/${lead.id}/assign-best-match`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setBestMatchError(data.error ?? "Failed to assign best match.");
+        return;
+      }
+
+      const updated = { id: lead.id, ...data.data } as Partial<LeadDetail> & { id: string };
+      const partnerName = data.assignment?.partner?.firm_name ?? "best matched partner";
+      const score = typeof data.assignment?.score === "number" ? ` (score ${data.assignment.score})` : "";
+
+      setLead((prev) => prev ? { ...prev, ...updated } : prev);
+      setAssignedId(String(data.data?.assigned_partner_account_id ?? ""));
+      setStatus((data.data?.status ?? "assigned") as LeadStatus);
+      onUpdated(updated);
+      setBestMatchSuccess(`Assigned to ${partnerName}${score}.`);
+      setTimeout(() => setBestMatchSuccess(null), 5000);
+    } catch {
+      setBestMatchError("Network error. Please try again.");
+    } finally {
+      setAssigningBest(false);
+    }
+  }
+
   const assignedPartner = partners.find(
     (p) => p.id === (assignedId || lead?.assigned_partner_account_id)
   );
+  const topEligiblePartner = eligibility.find((item) => item.eligible) ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8">
@@ -414,19 +452,40 @@ function LeadDetailModal({
 
               {/* Routing Eligibility Preview */}
               <section className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-blue-900">Routing Eligibility Preview</h3>
                     <p className="mt-1 text-xs text-blue-700">
-                      Informational only. Admin still manually chooses and saves the assigned partner.
+                      Admin-triggered assignment only. Review the recommendation, then click Assign Best Match or select a partner manually.
                     </p>
                   </div>
-                  {!eligibilityLoading && (
-                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-800">
-                      {eligibility.filter((item) => item.eligible).length} eligible
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {!eligibilityLoading && (
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-800">
+                        {eligibility.filter((item) => item.eligible).length} eligible
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleAssignBestMatch}
+                      disabled={eligibilityLoading || assigningBest || !topEligiblePartner}
+                      className="rounded-lg bg-[#1a3a5c] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0d1b2e] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {assigningBest ? "Assigning…" : "Assign Best Match"}
+                    </button>
+                  </div>
                 </div>
+
+                {bestMatchError && (
+                  <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {bestMatchError}
+                  </p>
+                )}
+                {bestMatchSuccess && (
+                  <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                    {bestMatchSuccess}
+                  </p>
+                )}
 
                 {eligibilityLoading && (
                   <p className="text-sm text-blue-700">Loading eligibility…</p>
@@ -520,7 +579,7 @@ function LeadDetailModal({
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
                     Assign Partner Account
-                    <span className="ml-1 font-normal text-gray-400">(manual only — no automatic routing)</span>
+                    <span className="ml-1 font-normal text-gray-400">(manual or best-match — no automatic routing)</span>
                   </label>
                   <select
                     value={assignedId}
@@ -655,7 +714,7 @@ export default function AdminLeadsPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#0d1b2e]">Lead Queue</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Leads received from Disability Benefits Screening. Manual assignment only — no automatic routing.
+            Leads received from Disability Benefits Screening. Assign manually or use admin-triggered best match — no automatic routing on ingest.
           </p>
         </div>
 
@@ -804,7 +863,7 @@ export default function AdminLeadsPage() {
 
         <p className="text-xs text-gray-400 text-center">
           Showing {leads.length} lead{leads.length !== 1 ? "s" : ""}.
-          No automatic routing — all partner assignments are manual.
+          No automatic routing on ingest — assignments are admin-triggered manually or by best match.
         </p>
       </main>
 
