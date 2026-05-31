@@ -788,6 +788,7 @@ export default function AdminLeadsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <span className="text-sm font-bold text-[#0d1b2e]">Legal Intake Flow Admin</span>
+            <a href="/admin" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Dashboard</a>
             <a href="/admin/partner-requests" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partner Requests</a>
             <a href="/admin/partners" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partner Accounts</a>
             <a href="/admin/leads" className="text-sm font-semibold text-[#1a3a5c]">Lead Queue</a>

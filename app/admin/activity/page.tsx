@@ -192,6 +192,7 @@ export default function AdminActivityPage() {
         <div className="flex items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-5">
             <span className="text-sm font-bold text-[#0d1b2e]">Legal Intake Flow Admin</span>
+            <a href="/admin" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Dashboard</a>
             <a href="/admin/partner-requests" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partner Requests</a>
             <a href="/admin/partners" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partners</a>
             <a href="/admin/leads" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Leads</a>

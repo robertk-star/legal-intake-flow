@@ -286,6 +286,7 @@ export default function AdminReportsPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
             <span className="text-sm font-bold text-[#0d1b2e]">Legal Intake Flow Admin</span>
+            <a href="/admin" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Dashboard</a>
             <a href="/admin/partner-requests" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partner Requests</a>
             <a href="/admin/activity" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Activity</a>
             <a href="/admin/exports" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Exports</a>

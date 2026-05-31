@@ -215,6 +215,7 @@ export default function AdminBillingStatementsPage() {
             <h1 className="text-xl font-bold text-[#0d1b2e]">Legal Intake Flow</h1>
           </div>
           <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+            <a href="/admin" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Dashboard</a>
             <a href="/admin/partner-requests" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partner Requests</a>
             <a href="/admin/partners" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partners</a>
             <a href="/admin/leads" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Leads</a>

@@ -282,3 +282,16 @@ Checks:
 5. Confirm partner navigation shows Dashboard, Account, Leads, Billing, Invoices, and Team.
 6. Update partner profile, routing preferences, billing contact, or team users and confirm the checklist/readiness score changes as expected.
 7. Log in as a staff/viewer user and confirm the dashboard is visible but management links still respect existing role permissions on target pages.
+
+## Phase 30 — Admin Dashboard Home QA
+
+1. Log in as admin.
+2. Open `/admin`.
+3. Confirm the dashboard loads without exposing secret values.
+4. Confirm the Action Center counts match the relevant admin areas:
+   - new leads in `/admin/leads`
+   - failed emails in `/admin/notifications`
+   - overdue invoices in `/admin/billing/invoices`
+   - open disputes in `/admin/billing/disputes`
+5. Confirm navigation includes Dashboard on major admin pages.
+6. Confirm non-admin users are redirected or blocked from `GET /api/admin/dashboard`.

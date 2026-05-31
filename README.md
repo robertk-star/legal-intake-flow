@@ -949,3 +949,24 @@ No new Vercel environment variable is required for Phase 29.
 ### Not included
 
 Phase 29 does not add billing, Stripe, payment processing, automatic routing, public LIF intake, or DBS frontend code.
+
+## Phase 30 — Admin Dashboard Home
+
+Phase 30 adds a read-only admin landing dashboard at `/admin`.
+
+New routes:
+
+- `GET /api/admin/dashboard` — admin-auth protected operational dashboard summary.
+- `/admin` — admin dashboard home.
+
+Dashboard sections include:
+
+- key operating metrics
+- action center for leads, failed emails, overdue invoices, disputes, and pending partner requests
+- lead status distribution
+- billing snapshot
+- notification status snapshot
+- top partner assignments
+- recent leads, assignments, and email attempts
+
+This phase does not add SQL migrations, new environment variables, automatic routing, payment processing, public claimant intake, or DBS frontend changes.
