@@ -119,7 +119,8 @@ export default function PartnerProfileForm({
               <input disabled={!canEdit} value={profile.firm_name} onChange={(e) => setField("firm_name", e.target.value)} className={inputClass(canEdit)} />
             </Field>
             <Field label="Website">
-              <input disabled={!canEdit} value={profile.website ?? ""} onChange={(e) => setField("website", e.target.value || null)} placeholder="https://example.com" className={inputClass(canEdit)} />
+              <input disabled={!canEdit} value={profile.website ?? ""} onChange={(e) => setField("website", e.target.value || null)} placeholder="example.com or https://example.com" className={inputClass(canEdit)} />
+              <p className="mt-1 text-xs text-gray-400">You can enter a domain only; https:// will be added automatically.</p>
             </Field>
             <Field label="Contact First Name" required>
               <input disabled={!canEdit} value={profile.contact_first_name} onChange={(e) => setField("contact_first_name", e.target.value)} className={inputClass(canEdit)} />
@@ -192,7 +193,7 @@ export default function PartnerProfileForm({
             )}
           </div>
         )}
-        {success && <p className="text-sm text-green-600">Firm profile saved successfully.</p>}
+        {success && <p className="text-sm text-green-600">Firm profile saved successfully. Website/domain formatting is normalized automatically.</p>}
 
         <button
           type="button"

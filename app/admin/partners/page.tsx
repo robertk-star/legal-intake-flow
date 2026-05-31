@@ -70,6 +70,18 @@ interface LoginRequest {
   status: "new" | "completed" | "dismissed";
 }
 
+interface ProfileEvent {
+  id: string;
+  created_at: string;
+  partner_account_id: string;
+  partner_user_id: string | null;
+  event_type: "profile_updated" | "billing_contact_updated";
+  changed_fields: string[] | null;
+  previous_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
+  note: string | null;
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ACCOUNT_STATUS_OPTIONS: AccountStatus[] = ["active", "inactive", "pending", "suspended"];
@@ -496,6 +508,35 @@ function PartnerDetailModal({
   const [linkError, setLinkError]           = useState<string | null>(null);
   const [copied, setCopied]                 = useState(false);
 
+  const [profileEvents, setProfileEvents]       = useState<ProfileEvent[]>([]);
+  const [profileEventsLoading, setProfileEventsLoading] = useState(true);
+  const [profileEventsError, setProfileEventsError]     = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProfileEventsLoading(true);
+    setProfileEventsError(null);
+
+    fetch(`/api/admin/partners/${partner.id}/profile-events`)
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!res.ok) {
+          setProfileEventsError(data.error ?? "Failed to load profile change history.");
+          return;
+        }
+        setProfileEvents(Array.isArray(data.data) ? data.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setProfileEventsError("Network error loading profile change history.");
+      })
+      .finally(() => {
+        if (!cancelled) setProfileEventsLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [partner.id]);
+
   async function handleSave() {
     setSaving(true);
     setSaveError(null);
@@ -606,6 +647,34 @@ function PartnerDetailModal({
               <PrefRow label="Profile Updated"  value={formatDateTime(partner.profile_updated_at ?? null)} />
               <PrefRow label="Billing Notes"    value={partner.billing_notes ?? "—"} />
             </div>
+          </section>
+
+          {/* Profile Change History */}
+          <section>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Profile Change History</h3>
+            {profileEventsLoading ? (
+              <p className="text-sm text-gray-400">Loading profile change history…</p>
+            ) : profileEventsError ? (
+              <p className="text-sm text-red-600">{profileEventsError}</p>
+            ) : profileEvents.length === 0 ? (
+              <p className="text-sm text-gray-400">No partner profile changes recorded yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {profileEvents.map((event) => (
+                  <div key={event.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold text-gray-800">
+                        {event.event_type === "billing_contact_updated" ? "Billing contact updated" : "Profile updated"}
+                      </span>
+                      <span className="text-xs text-gray-400">{formatDateTime(event.created_at)}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Changed fields: {(event.changed_fields ?? []).join(", ") || "—"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Account Settings */}

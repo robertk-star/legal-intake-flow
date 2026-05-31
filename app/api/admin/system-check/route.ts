@@ -90,6 +90,14 @@ const TABLE_PROBES: TableProbe[] = [
     select: "id, status, accepting_leads, lead_status, routing_states, billing_contact_email, billing_address_line1, profile_updated_at",
     required: true,
   },
+
+  {
+    key: "partner_account_profile_events",
+    label: "Partner profile change history",
+    table: "partner_account_profile_events",
+    select: "id, partner_account_id, partner_user_id, event_type, changed_fields, created_at",
+    required: true,
+  },
   {
     key: "partner_users",
     label: "Partner users",

@@ -4,6 +4,29 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 const PROFILE_EDIT_ROLES = ["owner", "admin"] as const;
 
+const PROFILE_AUDIT_FIELDS = [
+  "firm_name",
+  "contact_first_name",
+  "contact_last_name",
+  "phone",
+  "website",
+  "states_served",
+  "practice_area",
+  "billing_contact_name",
+  "billing_contact_email",
+  "billing_contact_phone",
+  "billing_address_line1",
+  "billing_address_line2",
+  "billing_city",
+  "billing_state",
+  "billing_zip",
+  "billing_notes",
+] as const;
+
+type ProfileAuditField = typeof PROFILE_AUDIT_FIELDS[number];
+
+type ProfileAuditRecord = Record<ProfileAuditField, string | null>;
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -24,6 +47,59 @@ function isValidEmail(value: string | null): boolean {
 function isValidState(value: string | null): boolean {
   if (!value) return true;
   return /^[A-Z]{2}$/.test(value);
+}
+
+function normalizeWebsite(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const withProtocol = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    const url = new URL(withProtocol);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return withProtocol;
+    if (!url.hostname || !url.hostname.includes(".")) return withProtocol;
+
+    url.protocol = url.protocol.toLowerCase();
+    url.hostname = url.hostname.toLowerCase();
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return withProtocol;
+  }
+}
+
+function isValidWebsite(value: string | null): boolean {
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    return (url.protocol === "http:" || url.protocol === "https:") && Boolean(url.hostname) && url.hostname.includes(".");
+  } catch {
+    return false;
+  }
+}
+
+function auditSnapshot(row: Record<string, unknown> | null | undefined): ProfileAuditRecord {
+  const snapshot = {} as ProfileAuditRecord;
+  for (const field of PROFILE_AUDIT_FIELDS) {
+    const value = row?.[field];
+    snapshot[field] = typeof value === "string" && value.trim() ? value.trim() : null;
+  }
+  return snapshot;
+}
+
+function diffAuditFields(before: ProfileAuditRecord, after: ProfileAuditRecord): ProfileAuditField[] {
+  return PROFILE_AUDIT_FIELDS.filter((field) => (before[field] ?? null) !== (after[field] ?? null));
+}
+
+function pickChangedValues(snapshot: ProfileAuditRecord, fields: ProfileAuditField[]) {
+  const picked: Partial<ProfileAuditRecord> = {};
+  for (const field of fields) {
+    picked[field] = snapshot[field];
+  }
+  return picked;
 }
 
 /**
@@ -60,7 +136,7 @@ export async function PATCH(request: NextRequest) {
   const contactFirstName = cleanString(body.contact_first_name, 100);
   const contactLastName = cleanString(body.contact_last_name, 100);
   const phone = cleanString(body.phone, 50);
-  const website = cleanString(body.website, 300);
+  const website = normalizeWebsite(cleanString(body.website, 300));
   const statesServed = cleanString(body.states_served, 500);
   const practiceArea = cleanString(body.practice_area, 300);
   const billingContactName = cleanString(body.billing_contact_name, 200);
@@ -83,13 +159,20 @@ export async function PATCH(request: NextRequest) {
   if (!practiceArea) errors.push("Practice area is required.");
   if (!isValidEmail(billingContactEmail)) errors.push("Billing contact email must be a valid email address.");
   if (!isValidState(billingState)) errors.push("Billing state must be a two-letter state abbreviation.");
-
-  if (website && !/^https?:\/\//i.test(website)) {
-    errors.push("Website must start with http:// or https://.");
-  }
+  if (!isValidWebsite(website)) errors.push("Website must be a valid domain or URL, such as saffhire.com or https://saffhire.com.");
 
   if (errors.length > 0) {
     return NextResponse.json({ success: false, error: "Validation failed.", details: errors }, { status: 422 });
+  }
+
+  const { data: beforeAccount, error: beforeError } = await supabaseAdmin
+    .from("partner_accounts")
+    .select(PROFILE_AUDIT_FIELDS.join(", "))
+    .eq("id", session.partnerAccountId)
+    .single();
+
+  if (beforeError || !beforeAccount) {
+    return NextResponse.json({ success: false, error: "Partner account not found." }, { status: 404 });
   }
 
   const update = {
@@ -129,5 +212,35 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Failed to save firm profile settings." }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, data });
+  const beforeSnapshot = auditSnapshot(beforeAccount as unknown as Record<string, unknown>);
+  const afterSnapshot = auditSnapshot(data as unknown as Record<string, unknown>);
+  const changedFields = diffAuditFields(beforeSnapshot, afterSnapshot);
+
+  if (changedFields.length > 0) {
+    const billingFields = changedFields.filter((field) => field.startsWith("billing_"));
+    const eventType = billingFields.length === changedFields.length ? "billing_contact_updated" : "profile_updated";
+
+    const { error: eventError } = await supabaseAdmin
+      .from("partner_account_profile_events")
+      .insert({
+        partner_account_id: session.partnerAccountId,
+        partner_user_id: session.partnerUserId,
+        event_type: eventType,
+        changed_fields: changedFields,
+        previous_values: pickChangedValues(beforeSnapshot, changedFields),
+        new_values: pickChangedValues(afterSnapshot, changedFields),
+      });
+
+    if (eventError) {
+      console.warn("[PATCH /api/partner/profile] Profile event insert skipped:", eventError.message);
+    }
+  }
+
+  return NextResponse.json({
+    success: true,
+    data,
+    normalized: {
+      website,
+    },
+  });
 }

@@ -220,3 +220,16 @@ Checks:
 6. Reload the page and confirm the saved values persist.
 7. Log in as a staff/viewer partner user and confirm the fields are visible but disabled.
 8. Open `/admin/partners`, view the partner account, and confirm the billing contact section shows the partner-maintained values.
+
+## Phase 26 — Partner Profile UX Cleanup & Change History QA
+
+1. Run `sql/section20_partner_profile_ux_audit.sql` in Supabase.
+2. Log in as a partner owner/admin.
+3. Open `/partner/account`.
+4. Enter a website as a bare domain, for example `saffhire.com`.
+5. Click **Save Firm Profile**.
+6. Confirm the profile saves and the website is stored/displayed as `https://saffhire.com`.
+7. Log in as admin and open `/admin/partners`.
+8. Open the same partner account.
+9. Confirm **Profile Change History** shows the changed profile fields.
+10. Open `/admin/system-check` and confirm the partner profile change history table passes.

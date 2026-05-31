@@ -795,3 +795,35 @@ Notes:
 - Staff/viewer partner users can view these fields but cannot edit them.
 - Admin partner management now displays the partner-maintained billing contact details.
 - This phase does not add Stripe, payment processing, automatic charges, public LIF intake, or DBS frontend code.
+
+## Phase 26 — Partner Profile UX Cleanup & Change History
+
+Phase 26 improves the partner firm profile editing experience and adds an audit trail for partner-maintained profile changes.
+
+Updated behavior:
+
+| Area | Change |
+|---|---|
+| `/partner/account` | Website field now accepts either a bare domain like `saffhire.com` or a full URL like `https://saffhire.com` |
+| `/api/partner/profile` | Automatically normalizes bare domains by adding `https://` and lowercasing the hostname |
+| `/admin/partners` | Partner detail modal now shows recent partner profile/billing contact change history |
+| `/admin/system-check` | Checks the profile change history table |
+
+New admin API route:
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/admin/partners/[id]/profile-events` | `GET` | Returns recent partner profile/billing contact change events for admin review |
+
+SQL migration:
+
+| File | Purpose |
+|---|---|
+| `sql/section20_partner_profile_ux_audit.sql` | Creates `partner_account_profile_events` audit table |
+
+Notes:
+
+- No payment processing, Stripe, automatic charges, public LIF intake, or DBS frontend code was added.
+- Partner profile audit logging is non-blocking. If audit logging fails, the profile save still succeeds.
+- Before testing Phase 26, run `sql/section20_partner_profile_ux_audit.sql` in Supabase.
+- No new Vercel environment variable is required.
