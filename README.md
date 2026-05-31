@@ -339,3 +339,34 @@ Email delivery uses Resend through the server-side environment variables:
 - `LIF_EMAIL_FROM`
 - optional `LIF_EMAIL_REPLY_TO`
 - recommended `LIF_APP_URL`
+
+---
+
+## Reporting & Analytics
+
+Phase 15 adds an admin reporting dashboard at `/admin/reports`.
+
+The reports page is admin-auth protected and summarizes existing LIF operational data from:
+
+- `leads`
+- `partner_accounts`
+- `partner_users`
+- `lead_assignment_events`
+- `email_notifications`
+
+### Included report sections
+
+- Lead volume: total leads, this week, this month, lead status, state, benefit type, and source
+- Assignment performance: assigned vs unassigned, assignment rate, average time to assign, assignment type, and leads assigned by partner
+- Partner response: partner response statuses, average time to view, average time to respond, retained leads, and declined leads
+- Partner activity: active partners, accepting leads, partner users, unviewed assigned leads, and partners near capacity
+- Coverage gaps: states with leads but no eligible routing partners, states with partner coverage but no leads, benefit-type coverage gaps, and paused/at-capacity partners
+- Email notifications: sent/failed/skipped/queued counts, notification type counts, and recent failed delivery attempts
+
+### API route
+
+`GET /api/admin/reports`
+
+No new SQL migration is required for Phase 15. The reports use tables and columns created by prior migrations through Phase 14.
+
+No new Vercel environment variables are required for Phase 15.
