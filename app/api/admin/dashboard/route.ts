@@ -28,8 +28,8 @@ type PartnerRequestRow = {
   created_at: string;
   status: string;
   firm_name: string | null;
-  contact_first_name: string | null;
-  contact_last_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   email: string | null;
 };
 
@@ -55,7 +55,7 @@ type DisputeRow = {
 type NotificationRow = {
   id: string;
   created_at: string;
-  type: string | null;
+  notification_type: string | null;
   status: string;
   recipient_email: string | null;
   subject: string | null;
@@ -160,7 +160,7 @@ export async function GET() {
     ),
     safeSelect<PartnerRequestRow>(
       "partner_access_requests",
-      "id, created_at, status, firm_name, contact_first_name, contact_last_name, email",
+      "id, created_at, status, firm_name, first_name, last_name, email",
       { orderColumn: "created_at", limit: 100 }
     ),
     safeSelect<InvoiceRow>(
@@ -175,7 +175,7 @@ export async function GET() {
     ),
     safeSelect<NotificationRow>(
       "email_notifications",
-      "id, created_at, type, status, recipient_email, subject",
+      "id, created_at, notification_type, status, recipient_email, subject",
       { orderColumn: "created_at", limit: 100 }
     ),
     safeSelect<AssignmentEventRow>(
@@ -328,7 +328,7 @@ export async function GET() {
   const recentNotifications = notifications.slice(0, 6).map((notification) => ({
     id: notification.id,
     created_at: notification.created_at,
-    type: notification.type ?? "notification",
+    type: notification.notification_type ?? "notification",
     status: notification.status,
     recipient: notification.recipient_email,
     subject: notification.subject,
