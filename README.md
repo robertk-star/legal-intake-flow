@@ -603,3 +603,47 @@ Creates:
 ### Important
 
 This phase does not add Stripe, ACH, credit cards, payment processing, automatic invoice sending, or billing emails. It is invoice draft and payment-status tracking only.
+
+## Phase 21 — Invoice Email Delivery
+
+Phase 21 adds admin-triggered invoice email delivery. It does not add Stripe, payment links, payment processing, automatic charges, or invoice sending on a schedule.
+
+### New route
+
+- `POST /api/admin/billing/invoices/[id]/send-email` — admin-auth protected; sends the selected invoice notice to active owner/admin users on the partner account.
+
+### Updated admin UI
+
+- `/admin/billing/invoices` invoice detail modal now includes an **Invoice Email** section with a **Send Invoice Email** button.
+- The modal shows the last invoice email sent timestamp and the invoice email count.
+- `/admin/notifications` now includes `invoice_sent` notification records.
+
+### SQL required
+
+Run:
+
+```text
+sql/section15_invoice_email_delivery.sql
+```
+
+This adds invoice email tracking fields, connects email notification rows to invoice IDs, and allows `email_sent` events in the invoice event log.
+
+### Environment variables
+
+No new environment variables are required if Phase 14 email is already configured.
+
+Live email delivery still requires:
+
+```text
+RESEND_API_KEY
+LIF_EMAIL_FROM
+```
+
+Recommended:
+
+```text
+LIF_EMAIL_REPLY_TO
+LIF_APP_URL
+```
+
+If email is not configured, sends are skipped and logged in `/admin/notifications`.

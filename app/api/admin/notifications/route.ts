@@ -3,7 +3,7 @@ import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 const VALID_STATUSES = ["queued", "sent", "failed", "skipped"] as const;
-const VALID_TYPES = ["partner_login_link", "lead_assigned"] as const;
+const VALID_TYPES = ["partner_login_link", "lead_assigned", "invoice_sent"] as const;
 
 /**
  * GET /api/admin/notifications
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     .select(
       "id, created_at, notification_type, recipient_email, recipient_name, subject, " +
       "status, provider, provider_message_id, error_message, sent_at, lead_id, " +
-      "partner_account_id, partner_user_id, login_request_id, metadata"
+      "partner_account_id, partner_user_id, login_request_id, invoice_id, metadata"
     )
     .order("created_at", { ascending: false })
     .limit(limit);

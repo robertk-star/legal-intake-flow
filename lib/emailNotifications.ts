@@ -5,7 +5,8 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type EmailNotificationType =
   | "partner_login_link"
-  | "lead_assigned";
+  | "lead_assigned"
+  | "invoice_sent";
 
 export type EmailSendResult = {
   sent: boolean;
@@ -26,6 +27,7 @@ type SendTransactionalEmailInput = {
   partnerAccountId?: string | null;
   partnerUserId?: string | null;
   loginRequestId?: string | null;
+  invoiceId?: string | null;
   metadata?: Record<string, unknown> | null;
 };
 
@@ -89,6 +91,7 @@ async function insertNotification(input: SendTransactionalEmailInput, status = "
       partner_account_id: input.partnerAccountId ?? null,
       partner_user_id: input.partnerUserId ?? null,
       login_request_id: input.loginRequestId ?? null,
+      invoice_id: input.invoiceId ?? null,
       metadata: input.metadata ?? null,
     })
     .select("id")
@@ -430,5 +433,267 @@ export async function sendLeadAssignedNotifications(input: {
     failed,
     errors,
     lead: leadSummary,
+  };
+}
+
+
+type InvoiceForEmail = {
+  id: string;
+  partner_account_id: string;
+  invoice_number: string;
+  status: string;
+  period_start: string;
+  period_end: string;
+  subtotal_cents: number;
+  total_cents: number;
+  amount_paid_cents: number;
+  balance_due_cents: number;
+  invoice_email_count: number | null;
+};
+
+type InvoiceItemForEmail = {
+  id: string;
+  description: string;
+  amount_cents: number;
+};
+
+function currency(cents: number | null | undefined) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((cents ?? 0) / 100);
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(`${value}T00:00:00.000Z`).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export async function sendInvoiceEmailNotifications(input: {
+  origin: string;
+  invoiceId: string;
+}) {
+  const { data: invoiceRow, error: invoiceError } = await supabaseAdmin
+    .from("partner_billing_invoices")
+    .select(
+      "id, partner_account_id, invoice_number, status, period_start, period_end, " +
+      "subtotal_cents, total_cents, amount_paid_cents, balance_due_cents, invoice_email_count"
+    )
+    .eq("id", input.invoiceId)
+    .single();
+
+  if (invoiceError || !invoiceRow) {
+    console.error("[sendInvoiceEmailNotifications] Invoice lookup failed:", invoiceError);
+    return { attempted: 0, sent: 0, skipped: 0, failed: 0, errors: ["Invoice lookup failed."] };
+  }
+
+  const invoice = invoiceRow as unknown as InvoiceForEmail;
+
+  const { data: accountRow, error: accountError } = await supabaseAdmin
+    .from("partner_accounts")
+    .select("id, firm_name, email, status")
+    .eq("id", invoice.partner_account_id)
+    .single();
+
+  if (accountError || !accountRow) {
+    console.error("[sendInvoiceEmailNotifications] Partner account lookup failed:", accountError);
+    return { attempted: 0, sent: 0, skipped: 0, failed: 0, errors: ["Partner account lookup failed."] };
+  }
+
+  const { data: itemRows, error: itemError } = await supabaseAdmin
+    .from("partner_billing_invoice_items")
+    .select("id, description, amount_cents")
+    .eq("invoice_id", input.invoiceId)
+    .order("created_at", { ascending: true });
+
+  if (itemError) {
+    console.error("[sendInvoiceEmailNotifications] Invoice item lookup failed:", itemError);
+    return { attempted: 0, sent: 0, skipped: 0, failed: 0, errors: ["Invoice item lookup failed."] };
+  }
+
+  const { data: userRows, error: usersError } = await supabaseAdmin
+    .from("partner_users")
+    .select("id, partner_account_id, email, first_name, last_name, role, status")
+    .eq("partner_account_id", invoice.partner_account_id)
+    .eq("status", "active")
+    .in("role", ["owner", "admin"]);
+
+  if (usersError) {
+    console.error("[sendInvoiceEmailNotifications] Partner users lookup failed:", usersError);
+    return { attempted: 0, sent: 0, skipped: 0, failed: 0, errors: ["Partner user lookup failed."] };
+  }
+
+  const partnerUsers = ((userRows ?? []) as unknown as PartnerUserForEmail[])
+    .filter((user) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email));
+
+  const dedupedUsers = Array.from(
+    new Map(partnerUsers.map((user) => [user.email.toLowerCase(), user])).values()
+  );
+
+  if (dedupedUsers.length === 0) {
+    return { attempted: 0, sent: 0, skipped: 0, failed: 0, errors: ["No active owner/admin partner users found."] };
+  }
+
+  const account = accountRow as unknown as PartnerAccountForEmail;
+  const items = (itemRows ?? []) as unknown as InvoiceItemForEmail[];
+  const invoiceUrl = `${input.origin}/partner/invoices`;
+  const subject = `Legal Intake Flow invoice ${invoice.invoice_number}`;
+  const period = `${formatDate(invoice.period_start)} – ${formatDate(invoice.period_end)}`;
+  const itemPreview = items.slice(0, 5);
+  const extraCount = Math.max(items.length - itemPreview.length, 0);
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const user of dedupedUsers) {
+    const name = displayName(user.first_name, user.last_name) ?? "Partner";
+    const text = [
+      `Hello ${name},`,
+      "",
+      `A Legal Intake Flow invoice is available for ${account.firm_name}.`,
+      "",
+      `Invoice: ${invoice.invoice_number}`,
+      `Billing Period: ${period}`,
+      `Total: ${currency(invoice.total_cents)}`,
+      `Amount Paid: ${currency(invoice.amount_paid_cents)}`,
+      `Balance Due: ${currency(invoice.balance_due_cents)}`,
+      "",
+      `View invoice details here: ${invoiceUrl}`,
+      "",
+      "This email is a billing notice only. It does not process payment or create an automatic charge.",
+    ].join("\n");
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; color: #0d1b2e; line-height: 1.5;">
+        <p>Hello ${escapeHtml(name)},</p>
+        <p>A Legal Intake Flow invoice is available for <strong>${escapeHtml(account.firm_name)}</strong>.</p>
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:16px 0;background:#f9fafb;">
+          <p style="margin:0 0 6px 0;"><strong>Invoice:</strong> ${escapeHtml(invoice.invoice_number)}</p>
+          <p style="margin:0 0 6px 0;"><strong>Billing Period:</strong> ${escapeHtml(period)}</p>
+          <p style="margin:0 0 6px 0;"><strong>Total:</strong> ${escapeHtml(currency(invoice.total_cents))}</p>
+          <p style="margin:0 0 6px 0;"><strong>Amount Paid:</strong> ${escapeHtml(currency(invoice.amount_paid_cents))}</p>
+          <p style="margin:0;"><strong>Balance Due:</strong> ${escapeHtml(currency(invoice.balance_due_cents))}</p>
+        </div>
+        ${itemPreview.length > 0 ? `
+          <p style="font-weight:600;margin:16px 0 8px 0;">Included lead items</p>
+          <ul style="padding-left:18px;margin-top:0;">
+            ${itemPreview.map((item) => `<li>${escapeHtml(item.description)} — ${escapeHtml(currency(item.amount_cents))}</li>`).join("")}
+            ${extraCount > 0 ? `<li>${extraCount} more item${extraCount === 1 ? "" : "s"} listed in the portal.</li>` : ""}
+          </ul>
+        ` : ""}
+        <p>
+          <a href="${escapeHtml(invoiceUrl)}" style="display:inline-block;background:#1a3a5c;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">
+            View Invoice
+          </a>
+        </p>
+        <p style="font-size:13px;color:#4b5563;">This email is a billing notice only. It does not process payment or create an automatic charge.</p>
+      </div>
+    `;
+
+    const result = await sendTransactionalEmail({
+      to: user.email,
+      recipientName: name,
+      subject,
+      text,
+      html,
+      notificationType: "invoice_sent",
+      partnerAccountId: invoice.partner_account_id,
+      partnerUserId: user.id,
+      invoiceId: invoice.id,
+      metadata: {
+        invoice_number: invoice.invoice_number,
+        period_start: invoice.period_start,
+        period_end: invoice.period_end,
+        total_cents: invoice.total_cents,
+        balance_due_cents: invoice.balance_due_cents,
+        item_count: items.length,
+      },
+    });
+
+    if (result.sent) sent += 1;
+    else if (result.skipped) skipped += 1;
+    else {
+      failed += 1;
+      if (result.error) errors.push(result.error);
+    }
+  }
+
+  let invoiceSummary: {
+    id: string;
+    invoice_email_sent_at: string | null;
+    invoice_email_count: number | null;
+    status: string;
+    sent_at: string | null;
+  } | null = null;
+
+  if (sent > 0) {
+    const now = new Date().toISOString();
+    const nextCount = Number(invoice.invoice_email_count ?? 0) + sent;
+    const invoiceUpdates: Record<string, unknown> = {
+      invoice_email_sent_at: now,
+      invoice_email_count: nextCount,
+    };
+
+    if (invoice.status === "draft") {
+      invoiceUpdates.status = "sent";
+      invoiceUpdates.sent_at = now;
+    }
+
+    const { data: updatedInvoice, error: updateError } = await supabaseAdmin
+      .from("partner_billing_invoices")
+      .update(invoiceUpdates)
+      .eq("id", input.invoiceId)
+      .select("id, invoice_email_sent_at, invoice_email_count, status, sent_at")
+      .single();
+
+    if (updateError) {
+      console.error("[sendInvoiceEmailNotifications] Failed to update invoice email summary:", updateError);
+    } else if (updatedInvoice) {
+      invoiceSummary = updatedInvoice as unknown as {
+        id: string;
+        invoice_email_sent_at: string | null;
+        invoice_email_count: number | null;
+        status: string;
+        sent_at: string | null;
+      };
+    }
+
+    if (invoice.status === "draft" && items.length > 0) {
+      const { data: invoiceItemsForLeads } = await supabaseAdmin
+        .from("partner_billing_invoice_items")
+        .select("lead_id")
+        .eq("invoice_id", input.invoiceId);
+      const relatedLeadIds = ((invoiceItemsForLeads ?? []) as unknown as Array<{ lead_id: string }>)
+        .map((item) => item.lead_id)
+        .filter(Boolean);
+      if (relatedLeadIds.length > 0) {
+        await supabaseAdmin
+          .from("leads")
+          .update({ billable_status: "invoiced" })
+          .in("id", relatedLeadIds);
+      }
+    }
+
+    await supabaseAdmin.from("partner_billing_invoice_events").insert({
+      invoice_id: input.invoiceId,
+      event_type: "email_sent",
+      previous_status: invoice.status,
+      next_status: invoiceSummary?.status ?? invoice.status,
+      amount_cents: invoice.total_cents,
+      notes: `Invoice email sent to ${sent} recipient${sent === 1 ? "" : "s"}.`,
+      created_by: "admin",
+    });
+  }
+
+  return {
+    attempted: dedupedUsers.length,
+    sent,
+    skipped,
+    failed,
+    errors,
+    invoice: invoiceSummary,
   };
 }

@@ -29,6 +29,8 @@ interface InvoiceRow {
   sent_at: string | null;
   paid_at: string | null;
   voided_at: string | null;
+  invoice_email_sent_at: string | null;
+  invoice_email_count: number | null;
 }
 
 interface InvoiceDetail extends InvoiceRow {
@@ -171,6 +173,9 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailMessage, setEmailMessage] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -216,6 +221,33 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
     }
   }
 
+  async function sendInvoiceEmail() {
+    if (!invoice) return;
+    setEmailSending(true);
+    setEmailError(null);
+    setEmailMessage(null);
+    try {
+      const res = await fetch(`/api/admin/billing/invoices/${invoice.id}/send-email`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setEmailError(data.error ?? "Failed to send invoice email.");
+        return;
+      }
+      const sent = data.data?.sent ?? 0;
+      const skipped = data.data?.skipped ?? 0;
+      const failed = data.data?.failed ?? 0;
+      setEmailMessage(`Invoice email sent to ${sent} recipient${sent === 1 ? "" : "s"}. Skipped: ${skipped}. Failed: ${failed}.`);
+      await load();
+      onUpdated();
+    } catch {
+      setEmailError("Network error while sending invoice email.");
+    } finally {
+      setEmailSending(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8">
       <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl">
@@ -231,10 +263,11 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
           {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           {invoice && (
             <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                 <StatCard label="Total" value={currency(invoice.total_cents)} />
                 <StatCard label="Paid" value={currency(invoice.amount_paid_cents)} />
                 <StatCard label="Balance" value={currency(invoice.balance_due_cents)} />
+                <StatCard label="Email Count" value={invoice.invoice_email_count ?? 0} />
                 <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Status</p><div className="mt-3"><StatusBadge status={invoice.status} /></div></div>
               </div>
 
@@ -250,6 +283,26 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
                 <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Invoice notes…" />
                 {success && <p className="mt-2 text-xs text-green-600">Invoice saved.</p>}
                 <button onClick={save} disabled={saving} className="mt-3 rounded-lg bg-[#1a3a5c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Save Invoice"}</button>
+              </section>
+
+              <section className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-blue-700">Invoice Email</h3>
+                    <p className="mt-1 text-sm text-blue-800">
+                      Email this invoice notice to active owner/admin users on the partner account. Last sent: {formatDateTime(invoice.invoice_email_sent_at)}.
+                    </p>
+                  </div>
+                  <button
+                    onClick={sendInvoiceEmail}
+                    disabled={emailSending || invoice.status === "void"}
+                    className="rounded-lg bg-[#1a3a5c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0d1b2e] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {emailSending ? "Sending…" : "Send Invoice Email"}
+                  </button>
+                </div>
+                {emailMessage && <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">{emailMessage}</p>}
+                {emailError && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{emailError}</p>}
               </section>
 
               <section>

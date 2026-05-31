@@ -141,3 +141,16 @@ Use this checklist after each deployment and after every new SQL migration or Ve
 12. Export invoice CSV as admin and as partner.
 
 No Stripe, payment processing, automatic invoice emails, or automatic charges should be present.
+
+## Phase 21 — Invoice Email Delivery QA
+
+1. Run `sql/section15_invoice_email_delivery.sql` in Supabase.
+2. Confirm `RESEND_API_KEY` and `LIF_EMAIL_FROM` are configured in Vercel if testing live email delivery.
+3. Open `/admin/billing/invoices`.
+4. Open an invoice with status `draft`, `sent`, or `partially_paid`.
+5. Click **Send Invoice Email**.
+6. Confirm the success/skipped/failure message appears.
+7. Confirm the invoice detail shows updated email count and last sent timestamp when delivery succeeds.
+8. Open `/admin/notifications` and confirm an `Invoice Sent` notification row appears.
+9. Log in as the partner and confirm the invoice remains visible at `/partner/invoices`.
+10. Confirm no Stripe, payment link, automatic charge, or invoice automation was added.

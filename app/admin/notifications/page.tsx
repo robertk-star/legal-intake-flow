@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type NotificationStatus = "queued" | "sent" | "failed" | "skipped";
-type NotificationType = "partner_login_link" | "lead_assigned";
+type NotificationType = "partner_login_link" | "lead_assigned" | "invoice_sent";
 
 interface EmailNotificationRow {
   id: string;
@@ -22,6 +22,7 @@ interface EmailNotificationRow {
   partner_account_id: string | null;
   partner_user_id: string | null;
   login_request_id: string | null;
+  invoice_id: string | null;
 }
 
 const STATUS_LABELS: Record<NotificationStatus, string> = {
@@ -41,6 +42,7 @@ const STATUS_COLORS: Record<NotificationStatus, string> = {
 const TYPE_LABELS: Record<NotificationType, string> = {
   partner_login_link: "Partner Login Link",
   lead_assigned: "Lead Assigned",
+  invoice_sent: "Invoice Sent",
 };
 
 function formatDateTime(iso: string | null) {
@@ -139,6 +141,7 @@ export default function AdminNotificationsPage() {
               <option value="">All Notification Types</option>
               <option value="partner_login_link">Partner Login Link</option>
               <option value="lead_assigned">Lead Assigned</option>
+              <option value="invoice_sent">Invoice Sent</option>
             </select>
             <select
               value={statusFilter}
@@ -215,6 +218,7 @@ export default function AdminNotificationsPage() {
                         {row.partner_account_id && <div>Account: {row.partner_account_id.slice(0, 8)}…</div>}
                         {row.partner_user_id && <div>User: {row.partner_user_id.slice(0, 8)}…</div>}
                         {row.login_request_id && <div>Login Req: {row.login_request_id.slice(0, 8)}…</div>}
+                        {row.invoice_id && <div>Invoice: {row.invoice_id.slice(0, 8)}…</div>}
                       </td>
                       <td className="max-w-xs px-4 py-3 text-xs text-red-600">
                         {row.error_message ?? "—"}

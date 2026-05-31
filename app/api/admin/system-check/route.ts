@@ -137,11 +137,33 @@ const TABLE_PROBES: TableProbe[] = [
     select: "id, lead_id, partner_account_id, event_type, created_at",
     required: true,
   },
+
+  {
+    key: "partner_billing_invoices",
+    label: "Partner billing invoices",
+    table: "partner_billing_invoices",
+    select: "id, partner_account_id, invoice_number, status, invoice_email_sent_at, invoice_email_count",
+    required: true,
+  },
+  {
+    key: "partner_billing_invoice_items",
+    label: "Partner billing invoice items",
+    table: "partner_billing_invoice_items",
+    select: "id, invoice_id, lead_id, amount_cents",
+    required: true,
+  },
+  {
+    key: "partner_billing_invoice_events",
+    label: "Partner billing invoice events",
+    table: "partner_billing_invoice_events",
+    select: "id, invoice_id, event_type, created_at",
+    required: true,
+  },
   {
     key: "email_notifications",
     label: "Email notification log",
     table: "email_notifications",
-    select: "id, notification_type, recipient_email, status, created_at",
+    select: "id, notification_type, recipient_email, status, created_at, invoice_id",
     required: true,
   },
 ];
