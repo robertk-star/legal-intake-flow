@@ -53,6 +53,8 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 | `/admin/notifications` | Email notification log — delivery status for login links and lead assignment notifications |
 | `/admin/reports` | Reporting dashboard — lead volume, assignment performance, partner activity, coverage gaps, notifications |
 | `/admin/system-check` | Production QA system check — required ENV, table/column probes, safety assumptions |
+| `/admin/billing` | Billing readiness review — mark assigned leads billable, invoiced, waived, disputed, etc. |
+| `/admin/billing/statements` | Partner billing statements — date-range summaries and CSV export for reviewed billable/invoiced leads |
 
 ### Partner (session-protected)
 
@@ -105,6 +107,10 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 | `/api/admin/notifications` | `GET` | List email notification delivery logs — supports `status`, `type`, `limit` |
 | `/api/admin/reports` | `GET` | Admin reporting and analytics summary |
 | `/api/admin/system-check` | `GET` | Production readiness check for required ENV, database tables/columns, and safety assumptions |
+| `/api/admin/billing` | `GET` | Billing-readiness lead review dashboard data |
+| `/api/admin/billing/leads/[id]` | `PATCH` | Update billing status, amount, and notes for an assigned lead |
+| `/api/admin/billing/statements` | `GET` | Partner billing statement summaries by date range, partner, and billing status |
+| `/api/admin/billing/statements/export` | `GET` | Download partner billing statement data as CSV |
 
 ### Partner
 
@@ -470,3 +476,47 @@ This migration adds billing-readiness fields to `public.leads` and creates the `
 ### Environment variables
 
 No new Vercel environment variables are required for Phase 17.
+---
+
+## Partner Billing Statements
+
+Phase 18 adds billing-period statements and CSV exports for admin review. This is still **not** payment processing and does not add Stripe, invoice sending, automatic charges, or partner payment collection.
+
+### Admin statements page
+
+Admins can open:
+
+```
+/admin/billing/statements
+```
+
+The page allows admin to:
+
+- choose a billing period date range
+- filter by partner
+- include billable/invoiced or other billing statuses
+- review partner-level statement totals
+- expand each partner statement to see individual leads
+- export the current statement view as CSV
+
+### API routes
+
+```
+GET /api/admin/billing/statements
+GET /api/admin/billing/statements/export
+```
+
+Both routes are admin-auth protected.
+
+### SQL migration
+
+No new SQL migration is required for Phase 18. It uses the billing-readiness fields from:
+
+```
+sql/section13_billing_readiness.sql
+```
+
+### Environment variables
+
+No new Vercel environment variables are required for Phase 18.
+

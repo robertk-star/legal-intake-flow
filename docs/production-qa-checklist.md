@@ -95,3 +95,16 @@ Use this checklist after each deployment and after every new SQL migration or Ve
 7. Save and confirm the row updates.
 8. Confirm recent billing event appears on the page.
 9. Confirm no invoice, Stripe payment, or automatic charge is created.
+
+## Phase 18 — Partner Billing Statements QA
+
+1. Confirm `sql/section13_billing_readiness.sql` has already been run. No new SQL is required for Phase 18.
+2. Open `/admin/billing/statements` as admin.
+3. Confirm the page loads with the current month date range.
+4. Confirm partner statement totals appear for billable/invoiced leads.
+5. Change the date range and refresh.
+6. Filter by a single partner and confirm only that partner appears.
+7. Toggle included billing statuses and confirm totals update.
+8. Expand a partner statement and confirm individual leads display.
+9. Click **Export CSV** and confirm a CSV downloads.
+10. Confirm no invoice email, Stripe payment, or automatic charge is created.
