@@ -560,3 +560,46 @@ Phase 19 depends on the Phase 17 billing readiness migration:
 ```text
 sql/section13_billing_readiness.sql
 ```
+
+## Phase 20 — Invoice Drafts & Payment Tracking Foundation
+
+Phase 20 adds internal invoice records and payment-status tracking without adding Stripe, payment processing, automatic charges, or invoice emails.
+
+### New SQL migration
+
+Run after deployment:
+
+```text
+sql/section14_invoice_drafts.sql
+```
+
+Creates:
+
+- `partner_billing_invoices`
+- `partner_billing_invoice_items`
+- `partner_billing_invoice_events`
+
+### New admin routes
+
+- `/admin/billing/invoices` — create invoice drafts, view invoice records, update invoice status/payment tracking, export invoice CSV.
+
+### New admin API routes
+
+- `GET /api/admin/billing/invoices`
+- `POST /api/admin/billing/invoices`
+- `GET /api/admin/billing/invoices/[id]`
+- `PATCH /api/admin/billing/invoices/[id]`
+- `GET /api/admin/billing/invoices/[id]/export`
+
+### New partner routes
+
+- `/partner/invoices` — read-only partner invoice list.
+
+### New partner API routes
+
+- `GET /api/partner/invoices`
+- `GET /api/partner/invoices/[id]/export`
+
+### Important
+
+This phase does not add Stripe, ACH, credit cards, payment processing, automatic invoice sending, or billing emails. It is invoice draft and payment-status tracking only.

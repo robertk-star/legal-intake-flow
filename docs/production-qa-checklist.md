@@ -124,3 +124,20 @@ Use this checklist after each deployment and after every new SQL migration or Ve
 8. Export CSV and confirm it downloads.
 9. Confirm the partner cannot edit billing status, amounts, or billing notes.
 10. Confirm no payment, Stripe, invoice sending, or public claimant intake behavior was added.
+
+## Phase 20 — Invoice Drafts & Payment Tracking QA
+
+1. Run `sql/section14_invoice_drafts.sql` in Supabase.
+2. Confirm at least one assigned lead is marked `billable` with a billing amount.
+3. Open `/admin/billing/invoices`.
+4. Click **Create Draft**.
+5. Select a partner and date range with billable leads.
+6. Confirm a draft invoice is created.
+7. Open the invoice and confirm invoice items appear.
+8. Update invoice status to `sent` and save.
+9. Confirm the related lead billing status changes to `invoiced`.
+10. Record a partial or full payment amount and confirm balance due updates.
+11. Open `/partner/invoices` as that partner and confirm sent/paid invoices are visible.
+12. Export invoice CSV as admin and as partner.
+
+No Stripe, payment processing, automatic invoice emails, or automatic charges should be present.

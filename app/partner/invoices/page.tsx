@@ -1,13 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  getAuthenticatedPartnerSession,
-  type PartnerRole,
-} from "@/lib/partnerAuth";
+import { getAuthenticatedPartnerSession, type PartnerRole } from "@/lib/partnerAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import PartnerLogoutButton from "../account/LogoutButton";
-import BillingDashboard from "./BillingDashboard";
+import PartnerInvoicesDashboard from "./PartnerInvoicesDashboard";
 
 interface PartnerAccountHeader {
   id: string;
@@ -36,12 +33,9 @@ const ROLE_COLORS: Record<PartnerRole, string> = {
   viewer: "bg-gray-100 text-gray-700",
 };
 
-export default async function PartnerBillingPage() {
+export default async function PartnerInvoicesPage() {
   const session = await getAuthenticatedPartnerSession();
-
-  if (!session) {
-    redirect("/partner/login");
-  }
+  if (!session) redirect("/partner/login");
 
   const { data: account, error: accountError } = await supabaseAdmin
     .from("partner_accounts")
@@ -49,9 +43,7 @@ export default async function PartnerBillingPage() {
     .eq("id", session.partnerAccountId)
     .single();
 
-  if (accountError || !account) {
-    redirect("/partner/login");
-  }
+  if (accountError || !account) redirect("/partner/login");
 
   const { data: user } = await supabaseAdmin
     .from("partner_users")
@@ -61,36 +53,19 @@ export default async function PartnerBillingPage() {
 
   const partnerAccount = account as PartnerAccountHeader;
   const partnerUser = user as PartnerUserHeader | null;
-  const displayName = partnerUser
-    ? `${partnerUser.first_name} ${partnerUser.last_name}`
-    : "Partner User";
+  const displayName = partnerUser ? `${partnerUser.first_name} ${partnerUser.last_name}` : "Partner User";
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="border-b border-gray-200 bg-[#0d1b2e]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-6">
-            <Image
-              src="/images/lif-name-logo.png"
-              alt="Legal Intake Flow"
-              width={180}
-              height={36}
-              className="h-8 w-auto object-contain brightness-0 invert"
-              priority
-            />
+            <Image src="/images/lif-name-logo.png" alt="Legal Intake Flow" width={180} height={36} className="h-8 w-auto object-contain brightness-0 invert" priority />
             <nav className="hidden items-center gap-4 text-sm sm:flex">
-              <Link href="/partner/account" className="text-white/70 hover:text-white">
-                Account
-              </Link>
-              <Link href="/partner/leads" className="text-white/70 hover:text-white">
-                Leads
-              </Link>
-              <Link href="/partner/billing" className="font-semibold text-white">
-                Billing
-              </Link>
-              <Link href="/partner/invoices" className="text-white/70 hover:text-white">
-                Invoices
-              </Link>
+              <Link href="/partner/account" className="text-white/70 hover:text-white">Account</Link>
+              <Link href="/partner/leads" className="text-white/70 hover:text-white">Leads</Link>
+              <Link href="/partner/billing" className="text-white/70 hover:text-white">Billing</Link>
+              <Link href="/partner/invoices" className="font-semibold text-white">Invoices</Link>
             </nav>
           </div>
           <PartnerLogoutButton />
@@ -100,27 +75,23 @@ export default async function PartnerBillingPage() {
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-10 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#0d1b2e]">Billing Statement</h1>
+            <h1 className="text-2xl font-bold text-[#0d1b2e]">Invoices</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Review billing status and statement details for leads assigned to {partnerAccount.firm_name}.
+              View invoice records and payment tracking details for {partnerAccount.firm_name}.
             </p>
           </div>
-
           {partnerUser && (
             <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm sm:text-right">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Signed in as</p>
               <p className="mt-0.5 text-sm font-semibold text-[#0d1b2e]">{displayName}</p>
               <p className="text-xs text-gray-500">{partnerUser.email}</p>
               <div className="mt-1.5 flex sm:justify-end">
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${ROLE_COLORS[session.role]}`}>
-                  {ROLE_LABELS[session.role]}
-                </span>
+                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${ROLE_COLORS[session.role]}`}>{ROLE_LABELS[session.role]}</span>
               </div>
             </div>
           )}
         </div>
-
-        <BillingDashboard />
+        <PartnerInvoicesDashboard />
       </main>
     </div>
   );
