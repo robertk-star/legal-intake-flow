@@ -1027,3 +1027,48 @@ No new Vercel environment variables are required for Phase 31.
 - Manual assignment remains available.
 - Assign Best Match remains available.
 - No billing, Stripe, public claimant intake, or DBS frontend code is added.
+
+---
+
+## Phase 32 — Partner Performance Reporting
+
+Phase 32 adds read-only partner-facing performance reporting.
+
+### New Partner Page
+
+- `/partner/reports` — performance dashboard for the authenticated partner account only
+
+### New API Route
+
+- `GET /api/partner/reports` — partner-auth protected report data endpoint
+
+The report includes:
+
+- total assigned leads
+- new leads
+- contacted/contact-attempted leads
+- accepted, declined, retained, and closed leads
+- average time to view
+- average time to first response
+- response-status breakdown
+- state, benefit type, and application-status breakdowns
+- billing-status summary
+- invoice balance summary
+- open dispute count
+- monthly lead trend
+
+### Security
+
+Partners can only see data where `assigned_partner_account_id` matches their authenticated partner account.
+
+No cross-partner reporting access is added.
+
+### SQL / Environment Variables
+
+No new SQL migration is required for Phase 32.
+
+No new Vercel environment variables are required for Phase 32.
+
+### Safety Notes
+
+Phase 32 does not add Stripe, payment processing, automatic charges, public LIF intake, automatic DBS routing, or DBS frontend code.

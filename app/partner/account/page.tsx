@@ -176,6 +176,9 @@ export default async function PartnerAccountPage() {
               <Link href="/partner/leads" className="text-white/70 hover:text-white">
                 Leads
               </Link>
+              <Link href="/partner/reports" className="text-white/70 hover:text-white">
+                Reports
+              </Link>
               <Link href="/partner/billing" className="text-white/70 hover:text-white">
                 Billing
               </Link>

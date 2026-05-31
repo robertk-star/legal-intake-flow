@@ -326,3 +326,14 @@ Safety checks:
 - Disable auto-ingest again if you do not want live DBS leads auto-assigned.
 - Confirm no public LIF intake route exists.
 - Confirm manual assignment still works.
+
+## Phase 32 — Partner Performance Reporting QA
+
+1. Log in as a partner user.
+2. Open `/partner/reports`.
+3. Confirm the report dashboard loads.
+4. Change the date range and click **Refresh Reports**.
+5. Confirm lead counts roughly match `/partner/leads` for the selected period.
+6. Confirm billing/invoice/dispute summaries match `/partner/billing` and `/partner/invoices`.
+7. Confirm a partner cannot access another partner account's reporting data.
+8. Confirm no new SQL migration or Vercel environment variable is required.

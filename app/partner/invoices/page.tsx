@@ -65,6 +65,7 @@ export default async function PartnerInvoicesPage() {
               <Link href="/partner/dashboard" className="text-white/70 hover:text-white">Dashboard</Link>
               <Link href="/partner/account" className="text-white/70 hover:text-white">Account</Link>
               <Link href="/partner/leads" className="text-white/70 hover:text-white">Leads</Link>
+              <Link href="/partner/reports" className="text-white/70 hover:text-white">Reports</Link>
               <Link href="/partner/billing" className="text-white/70 hover:text-white">Billing</Link>
               <Link href="/partner/invoices" className="font-semibold text-white">Invoices</Link>
               <Link href="/partner/team" className="text-white/70 hover:text-white">Team</Link>
