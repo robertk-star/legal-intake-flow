@@ -833,6 +833,8 @@ export default function AdminPartnersPage() {
             <span className="text-sm font-bold text-[#0d1b2e]">Legal Intake Flow Admin</span>
             <a href="/admin/partner-requests" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partner Requests</a>
             <a href="/admin/partners" className="text-sm font-semibold text-[#1a3a5c]">Partner Accounts</a>
+            <a href="/admin/leads" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Lead Queue</a>
+            <a href="/admin/notifications" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Notifications</a>
           </div>
           <form action="/api/admin/logout" method="POST">
             <button type="submit" className="text-xs text-gray-400 hover:text-gray-600">Sign Out</button>

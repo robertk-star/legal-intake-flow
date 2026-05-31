@@ -49,7 +49,8 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 | `/admin/login` | Admin login page |
 | `/admin/partner-requests` | Partner requests dashboard — search, filter, status update, create partner account, generate login link |
 | `/admin/partners` | Partner accounts dashboard — manage accounts, users, login requests, generate login links |
-| `/admin/leads` | Lead queue — DBS-sourced leads, detail view, status management, manual partner assignment |
+| `/admin/leads` | Lead queue — DBS-sourced leads, detail view, status management, manual/best-match partner assignment |
+| `/admin/notifications` | Email notification log — delivery status for login links and lead assignment notifications |
 
 ### Partner (session-protected)
 
@@ -97,7 +98,9 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 | `/api/admin/leads/[id]` | `GET` | Get full lead detail including `raw_payload` |
 | `/api/admin/leads/[id]` | `PATCH` | Update `status`, `internal_review_notes`, `assigned_partner_account_id` |
 | `/api/admin/leads/[id]/eligible-partners` | `GET` | Routing eligibility preview — state, benefit, stage, capacity, and accepting-leads checks |
-| `/api/admin/leads/[id]/assign-best-match` | `POST` | Admin-triggered assignment engine — assigns the highest-scoring eligible partner and records an assignment event |
+| `/api/admin/leads/[id]/assign-best-match` | `POST` | Admin-triggered assignment engine — assigns the highest-scoring eligible partner, records an assignment event, and sends assignment notifications |
+| `/api/admin/leads/[id]/send-assignment-notification` | `POST` | Resend/send assignment email notification for the lead's currently assigned partner account |
+| `/api/admin/notifications` | `GET` | List email notification delivery logs — supports `status`, `type`, `limit` |
 
 ### Partner
 
@@ -105,7 +108,7 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 |---|---|---|
 | `/api/partner/login` | `GET` | Validate one-time token, set partner session cookie (30d) |
 | `/api/partner/logout` | `POST` | Clear partner session cookie |
-| `/api/partner/request-login` | `POST` | Request a new login link (creates `partner_login_requests` row) |
+| `/api/partner/request-login` | `POST` | Request a new login link; emails a one-time login link when a matching active/pending partner user exists |
 | `/api/partner/preferences` | `PATCH` | Update partner preferences |
 | `/api/partner/leads` | `GET` | List leads assigned to the authenticated partner account |
 | `/api/partner/leads/[id]` | `GET` / `PATCH` | Get assigned lead detail; update partner response status and partner notes |
@@ -122,11 +125,17 @@ Copy `.env.example` to `.env.local` and fill in your values.
 | `LIF_ADMIN_SESSION_SECRET` | Recommended | HMAC SHA-256 signing secret for admin session tokens. Falls back to `LIF_ADMIN_PASSWORD` if not set. Generate: `openssl rand -base64 48`. **Server only.** |
 | `LIF_PARTNER_SESSION_SECRET` | Yes | HMAC SHA-256 signing secret for partner session tokens. Generate: `openssl rand -base64 48`. **Server only.** |
 | `LIF_DBS_INGEST_SECRET` | Yes | Shared secret for DBS-to-LIF lead ingestion. Must match the value set in DBS. Generate: `openssl rand -base64 48`. **Server only.** |
+| `RESEND_API_KEY` | Yes for email notifications | Resend API key used by Phase 14 email notifications. **Server only.** |
+| `LIF_EMAIL_FROM` | Yes for email notifications | Verified Resend sender address, for example `Legal Intake Flow <notifications@legalintakeflow.com>`. |
+| `LIF_EMAIL_REPLY_TO` | Optional | Reply-to address for notification emails. |
+| `LIF_APP_URL` | Recommended | Public app URL used in email links, for example `https://legalintakeflow.com`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon/public key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key — **server only** |
 
 > **After adding `LIF_DBS_INGEST_SECRET` to Vercel, you must redeploy for the ingest endpoint to become active.**
+>
+> **After adding or changing email environment variables (`RESEND_API_KEY`, `LIF_EMAIL_FROM`, `LIF_EMAIL_REPLY_TO`, `LIF_APP_URL`), redeploy before testing email notifications.**
 
 ---
 
@@ -147,6 +156,7 @@ Run migrations in order against your Supabase project using the SQL Editor.
 | `sql/section09_partner_lead_dashboard.sql` | **Run this for Phase 11.** Adds partner lead workflow fields: `partner_notes`, `partner_response_updated_at`, `partner_viewed_at`; adds valid partner response status constraint and indexes |
 | `sql/section10_partner_routing_rules.sql` | **Run this for Phase 12.** Adds structured `routing_states`, routing timestamps/notes, backfills from `states_served`, and adds indexes for routing eligibility previews |
 | `sql/section11_lead_assignment_engine.sql` | **Run this for Phase 13.** Adds `lead_assignment_events` audit table for manual, best-match, and reassignment events |
+| `sql/section12_email_notifications.sql` | **Run this for Phase 14.** Adds `email_notifications` delivery log table for partner login-link emails and lead assignment notifications |
 
 > **Note:** `section07_leads.sql` created the initial leads table for a public intake approach that has been superseded. Run `section08_dbs_lead_ingestion.sql` after `section07` (or instead of it on a fresh database) to align the schema with the DBS ingestion architecture.
 
@@ -212,7 +222,7 @@ The button:
 - clears prior partner response fields when reassigned to a different firm
 - writes an audit row to `lead_assignment_events` when the Phase 13 migration has been run
 
-Manual assignment remains available. Phase 13 does **not** automatically assign leads when DBS ingests them, and it does **not** send notifications.
+Manual assignment remains available. Phase 13 does **not** automatically assign leads when DBS ingests them. Phase 14 adds email notifications after admin assignment actions.
 
 ## Partner Lead Dashboard
 
@@ -247,7 +257,7 @@ Viewer-role partner users can view assigned leads but cannot update status or no
 1. Admin reviews a partner request in `/admin/partner-requests`
 2. Admin clicks **Create Partner Account** — creates a row in `partner_accounts` and an initial `owner` row in `partner_users`
 3. Admin navigates to `/admin/partners`, opens the account, and clicks **Generate Login Link** for the owner user
-4. Admin copies and sends the link to the partner via email
+4. Admin can copy/send the initial link manually, or the partner can later request an automatic login email from `/partner/login`
 5. Partner visits the link → `/partner/login?token=<raw_token>`
 6. Server hashes the token, looks up the hash in `partner_login_tokens`, validates expiry and used status
 7. Token is marked as used, `last_login_at` is updated on both `partner_accounts` and `partner_users`, a 30-day signed session cookie is set (includes `partnerAccountId`, `partnerUserId`, `role`)
@@ -292,3 +302,40 @@ This project is Vercel-compatible. Connect the GitHub repository to Vercel and a
 
 Partner inquiries: partners@legalintakeflow.com
 Legal: legal@legalintakeflow.com
+
+
+## Email Notifications
+
+Phase 14 adds transactional email delivery through Resend. Email is sent only from server-side routes and every attempt is logged in `public.email_notifications`.
+
+### Partner login link email
+
+When a partner visits `/partner/login`, enters their email, and the email matches an active or pending `partner_users` row, LIF automatically generates a new one-time login token and emails the login link. The public response remains neutral so the page does not reveal whether an account exists.
+
+If email configuration is missing or delivery fails, the login request remains visible to admin in `/admin/partners` so admin can still generate a login link manually.
+
+### Lead assignment email
+
+When admin manually assigns/reassigns a lead or clicks **Assign Best Match**, LIF emails active partner users on the assigned account with one of these roles:
+
+- owner
+- admin
+- staff
+
+Viewer users are not notified. The email includes a short lead summary and a link to `/partner/leads`. For privacy, medical details are not included in the email. Assignment emails are **not** sent automatically when DBS ingests a lead; DBS ingestion still only creates the lead.
+
+### Notification log
+
+Admins can review delivery attempts at `/admin/notifications`. Logged statuses are:
+
+- `queued`
+- `sent`
+- `failed`
+- `skipped`
+
+Email delivery uses Resend through the server-side environment variables:
+
+- `RESEND_API_KEY`
+- `LIF_EMAIL_FROM`
+- optional `LIF_EMAIL_REPLY_TO`
+- recommended `LIF_APP_URL`

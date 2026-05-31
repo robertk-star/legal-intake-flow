@@ -130,7 +130,7 @@ function PartnerLoginInner() {
             </div>
             <h1 className="text-lg font-bold text-[#0d1b2e]">Request Received</h1>
             <p className="mt-2 text-sm text-gray-600">
-              Your Legal Intake Flow administrator can generate a new login link for you.
+              If your email matches an active partner user, a secure login link will be emailed to you. If you do not receive it, your Legal Intake Flow administrator can help.
             </p>
           </div>
           <p className="text-xs text-gray-400">
@@ -171,7 +171,7 @@ function PartnerLoginInner() {
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-8 shadow-sm">
           <h1 className="text-xl font-bold text-[#0d1b2e]">Partner Login</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Enter your email address to request a new login link from your administrator.
+            Enter your email address and we will email a secure login link if your partner user account is active.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>

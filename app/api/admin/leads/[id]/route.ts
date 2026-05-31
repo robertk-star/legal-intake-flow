@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { sendLeadAssignedNotifications } from "@/lib/emailNotifications";
 
 const VALID_STATUSES = [
   "new", "reviewing", "ready_to_assign", "assigned", "closed", "rejected", "spam",
@@ -186,6 +187,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to update lead." }, { status: 500 });
   }
 
+  let notificationSummary = null;
+
   if (assignmentEvent) {
     const { error: eventError } = await supabaseAdmin
       .from("lead_assignment_events")
@@ -202,7 +205,14 @@ export async function PATCH(
       // The lead update succeeded; surface only in logs so the admin workflow is not blocked.
       console.error("[PATCH /api/admin/leads/[id]] Assignment event insert error:", eventError);
     }
+
+    notificationSummary = await sendLeadAssignedNotifications({
+      origin: (process.env.LIF_APP_URL?.replace(/\/$/, "") || new URL(request.url).origin),
+      leadId: id,
+      partnerAccountId: assignmentEvent.partnerAccountId,
+      assignmentType: assignmentEvent.assignmentType,
+    });
   }
 
-  return NextResponse.json({ success: true, data });
+  return NextResponse.json({ success: true, data, notifications: notificationSummary });
 }

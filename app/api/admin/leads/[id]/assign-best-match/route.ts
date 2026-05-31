@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { bestEligiblePartner, getPartnerEligibilityForLeadId } from "@/lib/leadRouting";
+import { sendLeadAssignedNotifications } from "@/lib/emailNotifications";
 
 type CurrentLead = {
   id: string;
@@ -16,7 +17,7 @@ type CurrentLead = {
  * automatically when leads are ingested; an admin must click the button.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   if (!(await isAdminAuthenticated())) {
@@ -115,6 +116,16 @@ export async function POST(
     console.error("[POST /api/admin/leads/[id]/assign-best-match] Event insert error:", eventError);
   }
 
+  let notificationSummary = null;
+  if (!samePartner) {
+    notificationSummary = await sendLeadAssignedNotifications({
+      origin: (process.env.LIF_APP_URL?.replace(/\/$/, "") || new URL(request.url).origin),
+      leadId: id,
+      partnerAccountId: bestPartnerId,
+      assignmentType,
+    });
+  }
+
   return NextResponse.json({
     success: true,
     data: updatedLead,
@@ -125,6 +136,7 @@ export async function POST(
       matchedRules: bestMatch.matchedRules,
       warnings: bestMatch.warnings,
       eventLogged: !eventError,
+      notifications: notificationSummary,
     },
   });
 }

@@ -44,6 +44,8 @@ interface LeadDetail extends LeadRow {
   partner_notes: string | null;
   partner_viewed_at: string | null;
   partner_response_updated_at: string | null;
+  assignment_notification_sent_at: string | null;
+  assignment_notification_count: number | null;
   raw_payload: Record<string, unknown> | null;
 }
 
@@ -170,6 +172,9 @@ function LeadDetailModal({
   const [assigningBest, setAssigningBest] = useState(false);
   const [bestMatchError, setBestMatchError] = useState<string | null>(null);
   const [bestMatchSuccess, setBestMatchSuccess] = useState<string | null>(null);
+  const [sendingNotification, setSendingNotification] = useState(false);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [notificationSuccess, setNotificationSuccess] = useState<string | null>(null);
 
   // Fetch full lead detail on mount
   useEffect(() => {
@@ -291,6 +296,44 @@ function LeadDetailModal({
       setBestMatchError("Network error. Please try again.");
     } finally {
       setAssigningBest(false);
+    }
+  }
+
+  async function handleSendAssignmentNotification() {
+    if (!lead) return;
+    setSendingNotification(true);
+    setNotificationError(null);
+    setNotificationSuccess(null);
+
+    try {
+      const res = await fetch(`/api/admin/leads/${lead.id}/send-assignment-notification`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setNotificationError(data.error ?? "Failed to send assignment email.");
+        return;
+      }
+
+      const sent = typeof data.sent === "number" ? data.sent : 0;
+      const recipients = typeof data.attempted === "number" ? data.attempted : sent;
+      const skipped = typeof data.skipped === "number" ? data.skipped : 0;
+      const failed = typeof data.failed === "number" ? data.failed : 0;
+      const suffix = skipped || failed ? ` (${skipped} skipped, ${failed} failed)` : "";
+      setNotificationSuccess(`Assignment email sent to ${sent} of ${recipients} recipient${recipients === 1 ? "" : "s"}${suffix}.`);
+
+      if (data.lead) {
+        const updated = { id: lead.id, ...data.lead } as Partial<LeadDetail> & { id: string };
+        setLead((prev) => prev ? { ...prev, ...updated } : prev);
+        onUpdated(updated);
+      }
+
+      setTimeout(() => setNotificationSuccess(null), 5000);
+    } catch {
+      setNotificationError("Network error. Please try again.");
+    } finally {
+      setSendingNotification(false);
     }
   }
 
@@ -424,6 +467,51 @@ function LeadDetailModal({
                     <p className="text-sm italic text-gray-400">No partner notes yet.</p>
                   )}
                 </div>
+              </section>
+
+              {/* Assignment Email Notification */}
+              <section className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-900">Assignment Email</h3>
+                    <p className="mt-1 text-xs text-emerald-700">
+                      Send or resend an assignment email to active owner, admin, and staff users for the assigned partner account.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSendAssignmentNotification}
+                    disabled={sendingNotification || !lead.assigned_partner_account_id}
+                    className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {sendingNotification ? "Sending…" : "Send Assignment Email"}
+                  </button>
+                </div>
+
+                {!lead.assigned_partner_account_id && (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                    Save a partner assignment before sending an assignment email.
+                  </p>
+                )}
+
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  <DetailField label="Last Sent" value={formatDateTime(lead.assignment_notification_sent_at)} />
+                  <DetailField
+                    label="Last Sent Count"
+                    value={lead.assignment_notification_count != null ? String(lead.assignment_notification_count) : null}
+                  />
+                </dl>
+
+                {notificationError && (
+                  <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {notificationError}
+                  </p>
+                )}
+                {notificationSuccess && (
+                  <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                    {notificationSuccess}
+                  </p>
+                )}
               </section>
 
               {/* Raw Payload (collapsed by default) */}
@@ -703,6 +791,7 @@ export default function AdminLeadsPage() {
             <a href="/admin/partner-requests" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partner Requests</a>
             <a href="/admin/partners" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partner Accounts</a>
             <a href="/admin/leads" className="text-sm font-semibold text-[#1a3a5c]">Lead Queue</a>
+            <a href="/admin/notifications" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Notifications</a>
           </div>
           <form action="/api/admin/logout" method="POST">
             <button type="submit" className="text-xs text-gray-400 hover:text-gray-600">Sign Out</button>
