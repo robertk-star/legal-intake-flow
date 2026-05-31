@@ -62,6 +62,7 @@ export default async function PartnerInvoicesPage() {
           <div className="flex items-center gap-6">
             <Image src="/images/lif-name-logo.png" alt="Legal Intake Flow" width={180} height={36} className="h-8 w-auto object-contain brightness-0 invert" priority />
             <nav className="hidden items-center gap-4 text-sm sm:flex">
+              <Link href="/partner/dashboard" className="text-white/70 hover:text-white">Dashboard</Link>
               <Link href="/partner/account" className="text-white/70 hover:text-white">Account</Link>
               <Link href="/partner/leads" className="text-white/70 hover:text-white">Leads</Link>
               <Link href="/partner/billing" className="text-white/70 hover:text-white">Billing</Link>

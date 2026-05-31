@@ -79,6 +79,9 @@ export default async function PartnerLeadsPage() {
               priority
             />
             <nav className="hidden items-center gap-4 text-sm sm:flex">
+              <Link href="/partner/dashboard" className="text-white/70 hover:text-white">
+                Dashboard
+              </Link>
               <Link href="/partner/account" className="text-white/70 hover:text-white">
                 Account
               </Link>

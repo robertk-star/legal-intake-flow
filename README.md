@@ -899,3 +899,53 @@ No new Vercel environment variable is required for Phase 28.
 - CSV values that could be interpreted as spreadsheet formulas are escaped.
 - Exports are capped at a maximum row limit to avoid accidental large downloads.
 - No public claimant intake, Stripe, payment processing, DBS frontend code, or automatic routing was added.
+
+---
+
+## Phase 29 — Partner Onboarding Polish
+
+Phase 29 adds a partner-facing onboarding dashboard and setup readiness experience.
+
+### New partner route
+
+| Route | Purpose |
+|---|---|
+| `/partner` | Redirects authenticated partner users to `/partner/dashboard` |
+| `/partner/dashboard` | Partner dashboard with setup readiness, checklist, operational summary cards, routing readiness, team access summary, and quick links |
+
+### Partner dashboard includes
+
+- Setup readiness percentage
+- Onboarding checklist for:
+  - firm profile completion
+  - routing preferences
+  - billing contact details
+  - team invitations
+- Assigned lead count
+- New lead count
+- Open invoice count
+- Open billing dispute count
+- Routing readiness summary
+- Team access summary
+- Quick links to Leads, Invoices, Team, and Account settings
+
+### Partner navigation
+
+The partner navigation now includes:
+
+- Dashboard
+- Account
+- Leads
+- Billing
+- Invoices
+- Team
+
+### SQL / ENV
+
+No new SQL migration is required for Phase 29.
+
+No new Vercel environment variable is required for Phase 29.
+
+### Not included
+
+Phase 29 does not add billing, Stripe, payment processing, automatic routing, public LIF intake, or DBS frontend code.

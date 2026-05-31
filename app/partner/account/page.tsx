@@ -167,6 +167,9 @@ export default async function PartnerAccountPage() {
               priority
             />
             <nav className="hidden items-center gap-4 text-sm sm:flex">
+              <Link href="/partner/dashboard" className="text-white/70 hover:text-white">
+                Dashboard
+              </Link>
               <Link href="/partner/account" className="font-semibold text-white">
                 Account
               </Link>

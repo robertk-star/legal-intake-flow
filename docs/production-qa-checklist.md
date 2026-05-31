@@ -262,3 +262,23 @@ Checks:
 - Confirm downloaded CSV files open correctly.
 - Confirm non-admin users cannot access `/api/admin/exports` or `/api/admin/exports/download`.
 - Confirm no new SQL migration or Vercel ENV is required.
+
+---
+
+## Phase 29 — Partner Onboarding Dashboard QA
+
+1. Log in as a partner owner or admin.
+2. Open `/partner/dashboard`.
+3. Confirm the dashboard loads and shows:
+   - setup readiness percentage
+   - onboarding checklist
+   - assigned leads count
+   - new leads count
+   - open invoices count
+   - open disputes count
+   - routing readiness summary
+   - team access summary
+4. Open `/partner` directly and confirm it redirects to `/partner/dashboard`.
+5. Confirm partner navigation shows Dashboard, Account, Leads, Billing, Invoices, and Team.
+6. Update partner profile, routing preferences, billing contact, or team users and confirm the checklist/readiness score changes as expected.
+7. Log in as a staff/viewer user and confirm the dashboard is visible but management links still respect existing role permissions on target pages.
