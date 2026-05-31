@@ -139,6 +139,14 @@ const TABLE_PROBES: TableProbe[] = [
   },
 
   {
+    key: "lead_assignment_settings",
+    label: "Lead assignment automation settings",
+    table: "lead_assignment_settings",
+    select: "id, auto_assignment_enabled, auto_assign_new_dbs_leads, minimum_score, updated_at",
+    required: true,
+  },
+
+  {
     key: "lead_billing_events",
     label: "Lead billing events",
     table: "lead_billing_events",

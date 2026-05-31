@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { assignBestMatchToLead, getLeadAssignmentSettings } from "@/lib/leadAssignmentEngine";
 
 /**
  * POST /api/intake/ingest
@@ -32,8 +33,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
  *   - Stores raw_payload (full incoming JSON) for audit/debugging
  *   - Sets source = 'disabilitybenefitsscreening'
  *   - Sets status = 'new'
- *   - Does NOT assign partner automatically
- *   - Does NOT send any emails
+ *   - Does not assign automatically unless Phase 31 admin controls explicitly enable auto-assignment on ingest
+ *   - Does not send lead assignment emails unless auto-assignment is enabled and notification controls allow it
  *   - Returns { success: true, leadId } on new creation (HTTP 201)
  *   - Returns { success: true, leadId, duplicate: true } on duplicate (HTTP 200)
  */
@@ -183,8 +184,26 @@ export async function POST(request: Request) {
     );
   }
 
+  // ── 6. Optional controlled auto-assignment ──────────────────────────────────
+  // Phase 31 adds admin-controlled auto-assignment. The default is OFF.
+  // When enabled, DBS-ingested leads can be automatically assigned using the
+  // same routing engine shown in the admin eligibility preview.
+  const { settings } = await getLeadAssignmentSettings();
+  let autoAssignment: unknown = null;
+
+  if (settings.auto_assignment_enabled && settings.auto_assign_new_dbs_leads) {
+    autoAssignment = await assignBestMatchToLead({
+      leadId: data.id,
+      origin: process.env.LIF_APP_URL?.replace(/\/$/, "") || new URL(request.url).origin,
+      assignmentType: "auto_ingest",
+      assignedBy: "system:dbs_ingest",
+      settings,
+      notifyPartner: settings.notify_partner_on_auto_assignment,
+    });
+  }
+
   return NextResponse.json(
-    { success: true, leadId: data.id },
+    { success: true, leadId: data.id, autoAssignment },
     { status: 201 }
   );
 }

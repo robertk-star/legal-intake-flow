@@ -970,3 +970,60 @@ Dashboard sections include:
 - recent leads, assignments, and email attempts
 
 This phase does not add SQL migrations, new environment variables, automatic routing, payment processing, public claimant intake, or DBS frontend changes.
+
+---
+
+## Phase 31 — Automated Lead Assignment Controls
+
+Phase 31 adds safe admin-controlled lead assignment automation.
+
+### New Admin Page
+
+- `/admin/routing` — routing controls and automation runner
+
+### New API Routes
+
+- `GET /api/admin/routing-settings` — fetch current assignment automation settings
+- `PATCH /api/admin/routing-settings` — update assignment automation settings
+- `POST /api/admin/leads/auto-assign` — run a controlled batch assignment for unassigned leads
+
+### Ingestion Behavior
+
+`POST /api/intake/ingest` remains DBS-only and still requires `LIF_DBS_INGEST_SECRET`.
+
+By default, DBS-ingested leads are **not** automatically assigned.
+
+If admin enables both controls on `/admin/routing`:
+
+- `auto_assignment_enabled`
+- `auto_assign_new_dbs_leads`
+
+then new DBS-ingested leads are evaluated by the existing routing engine and assigned to the best eligible partner only when the candidate passes the configured minimum score and blocker rules.
+
+### New SQL Migration
+
+Run before testing Phase 31:
+
+```sql
+sql/section21_auto_assignment_controls.sql
+```
+
+This migration creates:
+
+- `lead_assignment_settings`
+
+It also expands `lead_assignment_events.assignment_type` to support:
+
+- `auto_ingest`
+- `auto_batch`
+
+### Environment Variables
+
+No new Vercel environment variables are required for Phase 31.
+
+### Safety Notes
+
+- Automation is disabled by default.
+- Manual assignment remains available.
+- Assign Best Match remains available.
+- No billing, Stripe, public claimant intake, or DBS frontend code is added.

@@ -121,6 +121,7 @@ export default function AdminExportsPage() {
             <a href="/admin/partner-requests" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partner Requests</a>
             <a href="/admin/partners" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partners</a>
             <a href="/admin/leads" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Leads</a>
+            <a href="/admin/routing" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Routing</a>
             <a href="/admin/billing" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Billing</a>
             <a href="/admin/billing/invoices" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Invoices</a>
             <a href="/admin/billing/disputes" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Disputes</a>

@@ -295,3 +295,34 @@ Checks:
    - open disputes in `/admin/billing/disputes`
 5. Confirm navigation includes Dashboard on major admin pages.
 6. Confirm non-admin users are redirected or blocked from `GET /api/admin/dashboard`.
+
+---
+
+## Phase 31 — Automated Lead Assignment Controls QA
+
+Before testing:
+
+- Run `sql/section21_auto_assignment_controls.sql` in Supabase.
+- No new Vercel ENV variables are required.
+
+Test checklist:
+
+1. Log in as admin.
+2. Open `/admin/routing`.
+3. Confirm routing controls load.
+4. Confirm auto-assignment is off by default.
+5. Enable `Enable auto-assignment controls`.
+6. Save settings.
+7. Click `Run Now`.
+8. Confirm unassigned leads are assigned only if they have eligible partners.
+9. Enable `Auto-assign newly ingested DBS leads`.
+10. Submit a test lead through `/api/intake/ingest` with a unique external reference.
+11. Confirm the lead is assigned automatically only when it meets routing criteria.
+12. Confirm the assignment event is logged with `auto_ingest` or `auto_batch`.
+13. Confirm partner sees assigned lead on `/partner/leads`.
+
+Safety checks:
+
+- Disable auto-ingest again if you do not want live DBS leads auto-assigned.
+- Confirm no public LIF intake route exists.
+- Confirm manual assignment still works.
