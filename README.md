@@ -51,6 +51,8 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 | `/admin/partners` | Partner accounts dashboard — manage accounts, users, login requests, generate login links |
 | `/admin/leads` | Lead queue — DBS-sourced leads, detail view, status management, manual/best-match partner assignment |
 | `/admin/notifications` | Email notification log — delivery status for login links and lead assignment notifications |
+| `/admin/reports` | Reporting dashboard — lead volume, assignment performance, partner activity, coverage gaps, notifications |
+| `/admin/system-check` | Production QA system check — required ENV, table/column probes, safety assumptions |
 
 ### Partner (session-protected)
 
@@ -101,6 +103,8 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 | `/api/admin/leads/[id]/assign-best-match` | `POST` | Admin-triggered assignment engine — assigns the highest-scoring eligible partner, records an assignment event, and sends assignment notifications |
 | `/api/admin/leads/[id]/send-assignment-notification` | `POST` | Resend/send assignment email notification for the lead's currently assigned partner account |
 | `/api/admin/notifications` | `GET` | List email notification delivery logs — supports `status`, `type`, `limit` |
+| `/api/admin/reports` | `GET` | Admin reporting and analytics summary |
+| `/api/admin/system-check` | `GET` | Production readiness check for required ENV, database tables/columns, and safety assumptions |
 
 ### Partner
 
@@ -370,3 +374,50 @@ The reports page is admin-auth protected and summarizes existing LIF operational
 No new SQL migration is required for Phase 15. The reports use tables and columns created by prior migrations through Phase 14.
 
 No new Vercel environment variables are required for Phase 15.
+
+
+---
+
+## Production QA & System Check
+
+Phase 16 adds a production QA and hardening pass.
+
+### System check page
+
+Admins can open:
+
+```
+/admin/system-check
+```
+
+The page checks:
+
+- required environment variables
+- recommended email environment variables
+- Supabase connectivity
+- expected tables and phase columns
+- production safety assumptions
+
+The page does **not** display secret values. It only shows whether each item is configured or missing.
+
+### System check API
+
+```
+GET /api/admin/system-check
+```
+
+This route is admin-auth protected and returns structured check results for the system check page.
+
+### QA checklist
+
+A production QA checklist is available at:
+
+```
+docs/production-qa-checklist.md
+```
+
+Use it after deployments, SQL migrations, Vercel environment variable changes, and major feature releases.
+
+No new SQL migration is required for Phase 16.
+
+No new Vercel environment variables are required for Phase 16.

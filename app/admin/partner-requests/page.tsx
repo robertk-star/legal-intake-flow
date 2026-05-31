@@ -680,8 +680,13 @@ export default function AdminPartnerRequestsPage() {
               Admin
             </span>
           </div>
-          <nav className="flex items-center gap-6">
+          <nav className="flex flex-wrap items-center gap-4">
             <span className="text-sm font-medium text-white">Partner Requests</span>
+            <a href="/admin/partners" className="text-sm text-gray-300 hover:text-white">Partner Accounts</a>
+            <a href="/admin/leads" className="text-sm text-gray-300 hover:text-white">Lead Queue</a>
+            <a href="/admin/notifications" className="text-sm text-gray-300 hover:text-white">Notifications</a>
+            <a href="/admin/reports" className="text-sm text-gray-300 hover:text-white">Reports</a>
+            <a href="/admin/system-check" className="text-sm text-gray-300 hover:text-white">System Check</a>
             <button
               onClick={handleLogout}
               disabled={loggingOut}

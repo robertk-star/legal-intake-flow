@@ -1,0 +1,83 @@
+# Legal Intake Flow — Production QA Checklist
+
+Use this checklist after each deployment and after every new SQL migration or Vercel environment variable change.
+
+## 1. Required setup
+
+- Confirm Vercel deployment completed successfully.
+- Run any new SQL migration in Supabase before testing the feature that depends on it.
+- Add any new Vercel environment variables before testing and redeploy after adding them.
+- Open `/admin/system-check` and confirm no required checks are failing.
+
+## 2. Partner onboarding and admin review
+
+- Submit `/request-access` with a test partner request.
+- Log in at `/admin/login`.
+- Open `/admin/partner-requests`.
+- Confirm the request appears.
+- Update status and internal notes.
+- Approve the request.
+- Create a partner account.
+- Confirm an owner partner user exists.
+- Generate a partner login link.
+
+## 3. Partner account and users
+
+- Log in with the partner login link.
+- Confirm `/partner/account` loads.
+- Confirm the signed-in user badge is visible.
+- Update lead preferences and routing states.
+- Log out and request a new login link from `/partner/login`.
+- Confirm the login request appears in `/admin/partners`.
+- Add a second partner user from `/admin/partners`.
+- Generate a login link for that user.
+
+## 4. DBS lead ingestion
+
+- Confirm `LIF_DBS_INGEST_SECRET` is configured in Vercel.
+- Send a test lead to `POST /api/intake/ingest` with the `x-lif-ingest-secret` header.
+- Confirm unauthorized requests are rejected.
+- Confirm duplicate `source + external_reference_id` requests return the existing lead instead of creating duplicates.
+- Confirm the lead appears in `/admin/leads`.
+
+## 5. Lead review and assignment
+
+- Open the test lead from `/admin/leads`.
+- Confirm source, external reference, raw payload, and claimant details display.
+- Confirm Routing Eligibility Preview appears.
+- Manually assign the lead to a partner and save.
+- Reopen the lead and confirm assignment persisted.
+- Use Assign Best Match on another test lead and confirm assignment persisted.
+
+## 6. Partner lead dashboard
+
+- Log in as the assigned partner.
+- Open `/partner/leads`.
+- Confirm the assigned lead appears.
+- Open the lead detail.
+- Update partner response status and partner notes.
+- Confirm viewer-role users cannot update lead status or notes.
+- Return to `/admin/leads` and confirm partner response fields are visible.
+
+## 7. Email notifications
+
+- Confirm `RESEND_API_KEY` and `LIF_EMAIL_FROM` are configured before expecting live emails.
+- Request a partner login link from `/partner/login`.
+- Confirm email send attempt appears in `/admin/notifications`.
+- Assign or reassign a lead and confirm assignment email attempts are logged.
+- Use Send Assignment Email from the lead detail modal and confirm status is logged.
+
+## 8. Reports
+
+- Open `/admin/reports`.
+- Confirm lead, assignment, partner, coverage, and notification sections load.
+- Compare counts against `/admin/leads`, `/admin/partners`, and `/admin/notifications`.
+
+## 9. Safety checks
+
+- Confirm `/apply` is not active on LIF.
+- Confirm `/api/intake/submit` is not active on LIF.
+- Confirm admin pages require admin login.
+- Confirm partner pages require partner login.
+- Confirm a partner cannot see another partner account's assigned leads.
+- Confirm no `.env.local`, `.next`, `node_modules`, or TypeScript build info files are committed.
