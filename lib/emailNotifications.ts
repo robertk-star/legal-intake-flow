@@ -452,6 +452,7 @@ type InvoiceForEmail = {
   invoice_email_count: number | null;
   due_date: string | null;
   reminder_count: number | null;
+  payment_instructions: string | null;
 };
 
 type InvoiceItemForEmail = {
@@ -481,7 +482,7 @@ export async function sendInvoiceEmailNotifications(input: {
     .from("partner_billing_invoices")
     .select(
       "id, partner_account_id, invoice_number, status, period_start, period_end, " +
-      "subtotal_cents, total_cents, amount_paid_cents, balance_due_cents, invoice_email_count"
+      "subtotal_cents, total_cents, amount_paid_cents, balance_due_cents, invoice_email_count, due_date, payment_instructions"
     )
     .eq("id", input.invoiceId)
     .single();
@@ -563,11 +564,13 @@ export async function sendInvoiceEmailNotifications(input: {
       `Total: ${currency(invoice.total_cents)}`,
       `Amount Paid: ${currency(invoice.amount_paid_cents)}`,
       `Balance Due: ${currency(invoice.balance_due_cents)}`,
+      `Due Date: ${formatDate(invoice.due_date)}`,
+      invoice.payment_instructions ? `Payment Instructions: ${invoice.payment_instructions}` : null,
       "",
       `View invoice details here: ${invoiceUrl}`,
       "",
       "This email is a billing notice only. It does not process payment or create an automatic charge.",
-    ].join("\n");
+    ].filter((line): line is string => line !== null).join("\n");
 
     const html = `
       <div style="font-family: Arial, sans-serif; color: #0d1b2e; line-height: 1.5;">
@@ -578,8 +581,15 @@ export async function sendInvoiceEmailNotifications(input: {
           <p style="margin:0 0 6px 0;"><strong>Billing Period:</strong> ${escapeHtml(period)}</p>
           <p style="margin:0 0 6px 0;"><strong>Total:</strong> ${escapeHtml(currency(invoice.total_cents))}</p>
           <p style="margin:0 0 6px 0;"><strong>Amount Paid:</strong> ${escapeHtml(currency(invoice.amount_paid_cents))}</p>
-          <p style="margin:0;"><strong>Balance Due:</strong> ${escapeHtml(currency(invoice.balance_due_cents))}</p>
+          <p style="margin:0 0 6px 0;"><strong>Balance Due:</strong> ${escapeHtml(currency(invoice.balance_due_cents))}</p>
+          <p style="margin:0;"><strong>Due Date:</strong> ${escapeHtml(formatDate(invoice.due_date))}</p>
         </div>
+        ${invoice.payment_instructions ? `
+          <div style="border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin:16px 0;background:#f0fdf4;">
+            <p style="font-weight:600;margin:0 0 6px 0;">Payment instructions</p>
+            <p style="margin:0;white-space:pre-wrap;">${escapeHtml(invoice.payment_instructions)}</p>
+          </div>
+        ` : ""}
         ${itemPreview.length > 0 ? `
           <p style="font-weight:600;margin:16px 0 8px 0;">Included lead items</p>
           <ul style="padding-left:18px;margin-top:0;">
@@ -790,6 +800,8 @@ export async function sendInvoiceReminderNotifications(input: {
       `Total: ${currency(invoice.total_cents)}`,
       `Amount Paid: ${currency(invoice.amount_paid_cents)}`,
       `Balance Due: ${currency(invoice.balance_due_cents)}`,
+      `Due Date: ${formatDate(invoice.due_date)}`,
+      invoice.payment_instructions ? `Payment Instructions: ${invoice.payment_instructions}` : null,
       "",
       `View invoice details here: ${invoiceUrl}`,
       "",
@@ -804,8 +816,15 @@ export async function sendInvoiceReminderNotifications(input: {
           <p style="margin:0 0 6px 0;"><strong>Due Date:</strong> ${escapeHtml(dueDate)}${isOverdue ? ' <span style="color:#b91c1c;font-weight:600;">(overdue)</span>' : ""}</p>
           <p style="margin:0 0 6px 0;"><strong>Total:</strong> ${escapeHtml(currency(invoice.total_cents))}</p>
           <p style="margin:0 0 6px 0;"><strong>Amount Paid:</strong> ${escapeHtml(currency(invoice.amount_paid_cents))}</p>
-          <p style="margin:0;"><strong>Balance Due:</strong> ${escapeHtml(currency(invoice.balance_due_cents))}</p>
+          <p style="margin:0 0 6px 0;"><strong>Balance Due:</strong> ${escapeHtml(currency(invoice.balance_due_cents))}</p>
+          <p style="margin:0;"><strong>Due Date:</strong> ${escapeHtml(formatDate(invoice.due_date))}</p>
         </div>
+        ${invoice.payment_instructions ? `
+          <div style="border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin:16px 0;background:#f0fdf4;">
+            <p style="font-weight:600;margin:0 0 6px 0;">Payment instructions</p>
+            <p style="margin:0;white-space:pre-wrap;">${escapeHtml(invoice.payment_instructions)}</p>
+          </div>
+        ` : ""}
         <p>
           <a href="${escapeHtml(invoiceUrl)}" style="display:inline-block;background:#1a3a5c;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">
             View Invoice

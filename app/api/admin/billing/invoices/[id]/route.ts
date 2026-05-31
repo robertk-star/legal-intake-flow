@@ -100,7 +100,7 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   const currentStatus = String(currentInvoice.status);
-  let eventType: "status_changed" | "payment_recorded" | "payment_adjusted" | "voided" | "note_updated" | "due_date_updated" = "note_updated";
+  let eventType: "status_changed" | "payment_recorded" | "payment_adjusted" | "voided" | "note_updated" | "due_date_updated" | "payment_instructions_updated" | "payment_reference_updated" = "note_updated";
   let nextStatus: InvoiceStatus | null = null;
   let paymentCents: number | null = null;
 
@@ -109,6 +109,12 @@ export async function PATCH(
     if (!INVOICE_STATUSES.includes(status)) {
       return NextResponse.json(
         { error: `Invalid invoice status. Allowed values: ${INVOICE_STATUSES.join(", ")}.` },
+        { status: 422 }
+      );
+    }
+    if (currentInvoice.finalized_at && status === "draft") {
+      return NextResponse.json(
+        { error: "Finalized invoices cannot be returned to draft." },
         { status: 422 }
       );
     }
@@ -158,6 +164,38 @@ export async function PATCH(
     nextStatus = currentStatus as InvoiceStatus;
   }
 
+  if ("payment_instructions" in body) {
+    const instructions = String(body.payment_instructions ?? "").trim();
+    updates.payment_instructions = instructions || null;
+    eventType = "payment_instructions_updated";
+    nextStatus = currentStatus as InvoiceStatus;
+  }
+
+  if ("payment_method" in body) {
+    const method = String(body.payment_method ?? "").trim();
+    updates.payment_method = method || null;
+    eventType = "payment_reference_updated";
+    nextStatus = currentStatus as InvoiceStatus;
+  }
+
+  if ("payment_reference" in body) {
+    const reference = String(body.payment_reference ?? "").trim();
+    updates.payment_reference = reference || null;
+    eventType = "payment_reference_updated";
+    nextStatus = currentStatus as InvoiceStatus;
+  }
+
+  if ("payment_received_at" in body) {
+    const receivedAt = String(body.payment_received_at ?? "").trim();
+    if (receivedAt && !/^\d{4}-\d{2}-\d{2}$/.test(receivedAt)) {
+      return NextResponse.json({ error: "Payment received date must be in YYYY-MM-DD format." }, { status: 422 });
+    }
+    updates.payment_received_at = receivedAt ? `${receivedAt}T00:00:00.000Z` : null;
+    updates.payment_recorded_by = receivedAt ? "admin" : null;
+    eventType = "payment_reference_updated";
+    nextStatus = currentStatus as InvoiceStatus;
+  }
+
   if ("notes" in body) {
     const notes = String(body.notes ?? "").trim();
     updates.notes = notes || null;
@@ -186,7 +224,15 @@ export async function PATCH(
     previous_status: currentStatus,
     next_status: resolvedNextStatus,
     amount_cents: paymentCents,
-    notes: typeof body.notes === "string" ? body.notes.trim() || null : ("due_date" in body ? `Due date updated to ${String(body.due_date || "not set")}.` : null),
+    notes: typeof body.notes === "string"
+      ? body.notes.trim() || null
+      : "due_date" in body
+        ? `Due date updated to ${String(body.due_date || "not set")}.`
+        : "payment_instructions" in body
+          ? "Payment instructions updated."
+          : ("payment_method" in body || "payment_reference" in body || "payment_received_at" in body)
+            ? "Payment reference details updated."
+            : null,
     created_by: "admin",
   });
 

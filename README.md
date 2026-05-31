@@ -1072,3 +1072,35 @@ No new Vercel environment variables are required for Phase 32.
 ### Safety Notes
 
 Phase 32 does not add Stripe, payment processing, automatic charges, public LIF intake, automatic DBS routing, or DBS frontend code.
+
+## Phase 33 — Billing Finalization Prep
+
+Phase 33 adds finalization and manual payment tracking to the existing invoice workflow. It does not add Stripe, payment links, automatic charges, or online payment processing.
+
+### Added
+
+- SQL migration: `sql/section22_billing_finalization.sql`
+- Admin invoice finalization via `/admin/billing/invoices`
+- Invoice fields for:
+  - `finalized_at`
+  - `finalized_by`
+  - `payment_instructions`
+  - `payment_method`
+  - `payment_reference`
+  - `payment_received_at`
+  - `payment_recorded_by`
+- Finalized invoices cannot be returned to draft.
+- Finalizing a draft marks it as sent so it becomes partner-visible.
+- Partner invoice page now shows finalized date and payment instructions when available.
+- Invoice CSV exports include finalization and manual payment-reference fields.
+- Invoice emails can include payment instructions.
+
+### Required before testing
+
+Run the SQL migration in Supabase:
+
+```text
+sql/section22_billing_finalization.sql
+```
+
+No new Vercel environment variables are required.

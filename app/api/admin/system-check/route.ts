@@ -158,7 +158,7 @@ const TABLE_PROBES: TableProbe[] = [
     key: "partner_billing_invoices",
     label: "Partner billing invoices",
     table: "partner_billing_invoices",
-    select: "id, partner_account_id, invoice_number, status, invoice_email_sent_at, invoice_email_count, due_date, reminder_sent_at, reminder_count",
+    select: "id, partner_account_id, invoice_number, status, invoice_email_sent_at, invoice_email_count, due_date, reminder_sent_at, reminder_count, finalized_at, payment_instructions, payment_method, payment_reference, payment_received_at",
     required: true,
   },
   {

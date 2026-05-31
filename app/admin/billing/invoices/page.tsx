@@ -35,6 +35,13 @@ interface InvoiceRow {
   reminder_sent_at: string | null;
   reminder_count: number | null;
   overdue_marked_at: string | null;
+  finalized_at: string | null;
+  finalized_by: string | null;
+  payment_instructions: string | null;
+  payment_method: string | null;
+  payment_reference: string | null;
+  payment_received_at: string | null;
+  payment_recorded_by: string | null;
 }
 
 interface InvoiceDetail extends InvoiceRow {
@@ -177,6 +184,11 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
   const [amountPaid, setAmountPaid] = useState("");
   const [notes, setNotes] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [paymentInstructions, setPaymentInstructions] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [paymentReceivedAt, setPaymentReceivedAt] = useState("");
+  const [finalizing, setFinalizing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
@@ -202,6 +214,10 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
     setAmountPaid((loaded.amount_paid_cents / 100).toFixed(2));
     setNotes(loaded.notes ?? "");
     setDueDate(loaded.due_date ?? "");
+    setPaymentInstructions(loaded.payment_instructions ?? "");
+    setPaymentMethod(loaded.payment_method ?? "");
+    setPaymentReference(loaded.payment_reference ?? "");
+    setPaymentReceivedAt(loaded.payment_received_at ? loaded.payment_received_at.slice(0, 10) : "");
     setLoading(false);
   }, [invoiceId]);
 
@@ -215,7 +231,16 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
       const res = await fetch(`/api/admin/billing/invoices/${invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, amount_paid: amountPaid, notes, due_date: dueDate || null }),
+        body: JSON.stringify({
+          status,
+          amount_paid: amountPaid,
+          notes,
+          due_date: dueDate || null,
+          payment_instructions: paymentInstructions,
+          payment_method: paymentMethod,
+          payment_reference: paymentReference,
+          payment_received_at: paymentReceivedAt || null,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -228,6 +253,31 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
       setTimeout(() => setSuccess(false), 2500);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function finalizeInvoice() {
+    if (!invoice) return;
+    setFinalizing(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      const res = await fetch(`/api/admin/billing/invoices/${invoice.id}/finalize`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Failed to finalize invoice.");
+        return;
+      }
+      await load();
+      setSuccess(true);
+      onUpdated();
+      setTimeout(() => setSuccess(false), 2500);
+    } catch {
+      setError("Network error while finalizing invoice.");
+    } finally {
+      setFinalizing(false);
     }
   }
 
@@ -304,6 +354,7 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
                 <StatCard label="Total" value={currency(invoice.total_cents)} />
                 <StatCard label="Paid" value={currency(invoice.amount_paid_cents)} />
                 <StatCard label="Balance" value={currency(invoice.balance_due_cents)} />
+                <StatCard label="Finalized" value={formatDate(invoice.finalized_at)} />
                 <StatCard label="Email Count" value={invoice.invoice_email_count ?? 0} />
                 <StatCard label="Reminders" value={invoice.reminder_count ?? 0} />
                 <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Status</p><div className="mt-3"><StatusBadge status={invoice.status} /></div></div>
@@ -321,7 +372,28 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
                 </div>
                 <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Invoice notes…" />
                 {success && <p className="mt-2 text-xs text-green-600">Invoice saved.</p>}
-                <button onClick={save} disabled={saving} className="mt-3 rounded-lg bg-[#1a3a5c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Save Invoice"}</button>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <button onClick={save} disabled={saving} className="rounded-lg bg-[#1a3a5c] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Save Invoice"}</button>
+                  <button
+                    onClick={finalizeInvoice}
+                    disabled={finalizing || Boolean(invoice.finalized_at) || invoice.status === "void"}
+                    className="rounded-lg border border-green-700 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {invoice.finalized_at ? "Finalized" : finalizing ? "Finalizing…" : "Finalize & Mark Sent"}
+                  </button>
+                </div>
+                {invoice.finalized_at && <p className="mt-2 text-xs text-gray-500">Finalized {formatDateTime(invoice.finalized_at)} by {invoice.finalized_by ?? "admin"}. Finalized invoices cannot be returned to draft.</p>}
+              </section>
+
+              <section className="rounded-xl border border-gray-200 bg-white p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Payment Instructions & Tracking</h3>
+                <p className="mt-1 text-sm text-gray-500">Manual/off-platform payment details only. No payment processing or Stripe connection is enabled.</p>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <input value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Payment method (check, ACH, wire)" />
+                  <input value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Reference / check #" />
+                  <input type="date" value={paymentReceivedAt} onChange={(e) => setPaymentReceivedAt(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" title="Payment received date" />
+                </div>
+                <textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} rows={4} className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Payment instructions shown to partner, such as check mailing address or ACH instructions." />
               </section>
 
               <section className="rounded-xl border border-blue-200 bg-blue-50 p-4">
@@ -462,7 +534,7 @@ export default function AdminInvoicesPage() {
         {error && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           {loading ? <p className="py-12 text-center text-sm text-gray-400">Loading invoices…</p> : invoices.length === 0 ? <p className="py-12 text-center text-sm text-gray-500">No invoices found.</p> : (
-            <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-4 py-3 text-left">Invoice</th><th className="px-4 py-3 text-left">Partner</th><th className="px-4 py-3 text-left">Period</th><th className="px-4 py-3 text-left">Due</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3 text-left">Actions</th></tr></thead><tbody className="divide-y divide-gray-100">{invoices.map((invoice) => <tr key={invoice.id} className="hover:bg-gray-50"><td className="px-4 py-3 font-semibold text-[#0d1b2e]">{invoice.invoice_number}<div className="text-xs font-normal text-gray-400">{formatDate(invoice.created_at)}</div></td><td className="px-4 py-3 text-gray-700">{invoice.partner_firm_name}</td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.period_start)} – {formatDate(invoice.period_end)}</td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.due_date)}{invoice.reminder_count ? <div className="text-xs text-gray-400">{invoice.reminder_count} reminder{invoice.reminder_count === 1 ? "" : "s"}</div> : null}</td><td className="px-4 py-3"><StatusBadge status={invoice.status} /></td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.total_cents)}</td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.balance_due_cents)}</td><td className="px-4 py-3"><button onClick={() => setSelectedInvoiceId(invoice.id)} className="rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white">View</button></td></tr>)}</tbody></table></div>
+            <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-4 py-3 text-left">Invoice</th><th className="px-4 py-3 text-left">Partner</th><th className="px-4 py-3 text-left">Period</th><th className="px-4 py-3 text-left">Due</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-left">Finalized</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3 text-left">Actions</th></tr></thead><tbody className="divide-y divide-gray-100">{invoices.map((invoice) => <tr key={invoice.id} className="hover:bg-gray-50"><td className="px-4 py-3 font-semibold text-[#0d1b2e]">{invoice.invoice_number}<div className="text-xs font-normal text-gray-400">{formatDate(invoice.created_at)}</div></td><td className="px-4 py-3 text-gray-700">{invoice.partner_firm_name}</td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.period_start)} – {formatDate(invoice.period_end)}</td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.due_date)}{invoice.reminder_count ? <div className="text-xs text-gray-400">{invoice.reminder_count} reminder{invoice.reminder_count === 1 ? "" : "s"}</div> : null}</td><td className="px-4 py-3"><StatusBadge status={invoice.status} /></td><td className="px-4 py-3 text-xs text-gray-500">{formatDate(invoice.finalized_at)}</td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.total_cents)}</td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.balance_due_cents)}</td><td className="px-4 py-3"><button onClick={() => setSelectedInvoiceId(invoice.id)} className="rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white">View</button></td></tr>)}</tbody></table></div>
           )}
         </div>
       </main>

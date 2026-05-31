@@ -337,3 +337,18 @@ Safety checks:
 6. Confirm billing/invoice/dispute summaries match `/partner/billing` and `/partner/invoices`.
 7. Confirm a partner cannot access another partner account's reporting data.
 8. Confirm no new SQL migration or Vercel environment variable is required.
+
+## Phase 33 — Billing Finalization Prep QA
+
+1. Run `sql/section22_billing_finalization.sql` in Supabase.
+2. Open `/admin/billing/invoices`.
+3. Open a draft invoice.
+4. Add payment instructions, such as check mailing or ACH instructions.
+5. Click **Finalize & Mark Sent**.
+6. Confirm the invoice shows a finalized date and status `sent`.
+7. Confirm the invoice cannot be returned to `draft`.
+8. Log in as the partner and open `/partner/invoices`.
+9. Confirm the invoice is visible and payment instructions appear.
+10. Export invoice CSV from admin and partner views and confirm finalization/payment-reference fields appear.
+
+No Stripe/payment processing should be present.
