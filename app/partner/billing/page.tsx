@@ -7,7 +7,7 @@ import {
 } from "@/lib/partnerAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import PartnerLogoutButton from "../account/LogoutButton";
-import PartnerLeadsDashboard from "./PartnerLeadsDashboard";
+import BillingDashboard from "./BillingDashboard";
 
 interface PartnerAccountHeader {
   id: string;
@@ -36,7 +36,7 @@ const ROLE_COLORS: Record<PartnerRole, string> = {
   viewer: "bg-gray-100 text-gray-700",
 };
 
-export default async function PartnerLeadsPage() {
+export default async function PartnerBillingPage() {
   const session = await getAuthenticatedPartnerSession();
 
   if (!session) {
@@ -82,10 +82,10 @@ export default async function PartnerLeadsPage() {
               <Link href="/partner/account" className="text-white/70 hover:text-white">
                 Account
               </Link>
-              <Link href="/partner/leads" className="font-semibold text-white">
+              <Link href="/partner/leads" className="text-white/70 hover:text-white">
                 Leads
               </Link>
-              <Link href="/partner/billing" className="text-white/70 hover:text-white">
+              <Link href="/partner/billing" className="font-semibold text-white">
                 Billing
               </Link>
             </nav>
@@ -97,9 +97,9 @@ export default async function PartnerLeadsPage() {
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-10 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#0d1b2e]">Assigned Leads</h1>
+            <h1 className="text-2xl font-bold text-[#0d1b2e]">Billing Statement</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Review DBS leads manually assigned to {partnerAccount.firm_name}.
+              Review billing status and statement details for leads assigned to {partnerAccount.firm_name}.
             </p>
           </div>
 
@@ -117,13 +117,7 @@ export default async function PartnerLeadsPage() {
           )}
         </div>
 
-        {session.role === "viewer" && (
-          <div className="rounded-xl border border-yellow-200 bg-yellow-50 px-5 py-4 text-sm text-yellow-800">
-            Your role is Viewer. You can review assigned leads, but you cannot update lead status or partner notes.
-          </div>
-        )}
-
-        <PartnerLeadsDashboard role={session.role} />
+        <BillingDashboard />
       </main>
     </div>
   );

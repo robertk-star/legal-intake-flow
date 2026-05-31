@@ -108,3 +108,19 @@ Use this checklist after each deployment and after every new SQL migration or Ve
 8. Expand a partner statement and confirm individual leads display.
 9. Click **Export CSV** and confirm a CSV downloads.
 10. Confirm no invoice email, Stripe payment, or automatic charge is created.
+
+---
+
+## Phase 19 — Partner Billing Portal QA
+
+1. Confirm Phase 17 SQL has already been run:
+   - `sql/section13_billing_readiness.sql`
+2. In admin, open `/admin/billing` and mark at least one assigned lead as `billable` or `invoiced` with an amount.
+3. Log in as the assigned partner.
+4. Open `/partner/billing`.
+5. Confirm the partner sees only billing records for their own partner account.
+6. Confirm the billing totals match the selected date range and statuses.
+7. Change the date range and included statuses, then refresh.
+8. Export CSV and confirm it downloads.
+9. Confirm the partner cannot edit billing status, amounts, or billing notes.
+10. Confirm no payment, Stripe, invoice sending, or public claimant intake behavior was added.

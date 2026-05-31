@@ -520,3 +520,43 @@ sql/section13_billing_readiness.sql
 
 No new Vercel environment variables are required for Phase 18.
 
+
+---
+
+## Phase 19 — Partner Billing Portal
+
+Phase 19 adds a read-only partner billing statement portal. Partners can review lead billing statuses and amounts that LIF admin has already marked in the billing readiness workflow.
+
+### New Partner Page
+
+| Route | Purpose |
+|---|---|
+| `/partner/billing` | Partner-facing billing statement preview for the logged-in partner account |
+
+### New Partner API Routes
+
+| Route | Purpose |
+|---|---|
+| `GET /api/partner/billing` | Returns billing statement summary and lead billing records for the authenticated partner account only |
+| `GET /api/partner/billing/export` | Exports the authenticated partner account's billing statement view as CSV |
+
+### Important Notes
+
+- This is not payment processing.
+- This does not generate legal invoices.
+- This does not connect Stripe or any payment gateway.
+- Partners can only see billing records for leads assigned to their own partner account.
+- Partners cannot edit billing status, billing amounts, or billing notes.
+- Billing values are controlled by admin through `/admin/billing`.
+
+### Phase 19 Setup
+
+No new SQL migration is required for Phase 19.
+
+No new Vercel environment variable is required for Phase 19.
+
+Phase 19 depends on the Phase 17 billing readiness migration:
+
+```text
+sql/section13_billing_readiness.sql
+```
