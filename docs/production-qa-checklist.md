@@ -233,3 +233,20 @@ Checks:
 8. Open the same partner account.
 9. Confirm **Profile Change History** shows the changed profile fields.
 10. Open `/admin/system-check` and confirm the partner profile change history table passes.
+
+## Phase 27 — Admin Activity Timeline QA
+
+1. Log in as admin.
+2. Open `/admin/activity`.
+3. Confirm the timeline loads.
+4. Confirm filters work for:
+   - All Activity
+   - Assignments
+   - Emails
+   - Lead Billing
+   - Invoices
+   - Disputes
+   - Profiles
+5. Trigger one or more existing system events, such as sending an invoice reminder or editing a partner profile.
+6. Refresh `/admin/activity` and confirm the new event appears.
+7. Confirm no secret values are displayed in event details.

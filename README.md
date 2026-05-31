@@ -827,3 +827,32 @@ Notes:
 - Partner profile audit logging is non-blocking. If audit logging fails, the profile save still succeeds.
 - Before testing Phase 26, run `sql/section20_partner_profile_ux_audit.sql` in Supabase.
 - No new Vercel environment variable is required.
+
+## Phase 27 — Admin Activity Timeline
+
+Phase 27 adds a centralized internal activity timeline for operations and troubleshooting.
+
+### New admin page
+
+- `/admin/activity` — Activity Timeline
+
+### New admin API route
+
+- `GET /api/admin/activity` — returns a combined admin-authenticated activity feed from existing audit/event tables.
+
+The timeline includes:
+
+- lead assignment events
+- email notification attempts
+- lead billing review events
+- invoice events
+- invoice dispute events
+- partner profile change events
+
+Filters include category, search, start date, and end date.
+
+### Setup
+
+No new SQL migration is required for Phase 27.
+
+No new Vercel environment variable is required for Phase 27.
