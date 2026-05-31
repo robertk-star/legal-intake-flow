@@ -132,7 +132,7 @@ async function optionalSelect<T>(table: string, select: string): Promise<{ rows:
     console.warn(`[GET /api/admin/reports] Optional table ${table} unavailable:`, error);
     return { rows: [], warning: `Could not load ${table}. Confirm the related SQL migration has been run.` };
   }
-  return { rows: (data ?? []) as T[], warning: null };
+  return { rows: (data ?? []) as unknown as T[], warning: null };
 }
 
 /**
@@ -196,8 +196,8 @@ export async function GET() {
   );
   if (notificationsResult.warning) warnings.push(notificationsResult.warning);
 
-  const leads = (leadsResult.data ?? []) as LeadRow[];
-  const partners = (partnersResult.data ?? []) as PartnerRow[];
+  const leads = (leadsResult.data ?? []) as unknown as LeadRow[];
+  const partners = (partnersResult.data ?? []) as unknown as PartnerRow[];
   const partnerUsers = usersResult.rows;
   const assignmentEvents = assignmentsResult.rows;
   const notifications = notificationsResult.rows;
