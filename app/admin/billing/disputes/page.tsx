@@ -187,7 +187,7 @@ export default function AdminBillingDisputesPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           <div><h1 className="text-xl font-bold text-[#0d1b2e]">Invoice Disputes</h1><p className="text-sm text-gray-500">Partner billing questions and dispute resolution. No automatic credits or payments.</p></div>
           <nav className="flex flex-wrap gap-3 text-sm"><a href="/admin/billing" className="text-gray-600 hover:text-[#0d1b2e]">Billing</a><a href="/admin/billing/invoices" className="text-gray-600 hover:text-[#0d1b2e]">Invoices</a><a href="/admin/billing/statements" className="text-gray-600 hover:text-[#0d1b2e]">Statements</a><a href="/admin/billing/disputes" className="font-semibold text-[#1a3a5c]">Disputes</a><a href="/admin/reports" className="text-gray-600 hover:text-[#0d1b2e]">Reports</a>
-            <a href="/admin/activity" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Activity</a></nav>
+            <a href="/admin/activity" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Activity</a><a href="/admin/exports" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Exports</a></nav>
         </div>
       </header>
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">

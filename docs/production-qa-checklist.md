@@ -250,3 +250,15 @@ Checks:
 5. Trigger one or more existing system events, such as sending an invoice reminder or editing a partner profile.
 6. Refresh `/admin/activity` and confirm the new event appears.
 7. Confirm no secret values are displayed in event details.
+
+
+## Phase 28 — Admin Data Export Center
+
+- Open `/admin/exports`.
+- Confirm the export catalog loads.
+- Export Leads for the last 30 days.
+- Export Partner Accounts.
+- Export Invoices or Notifications if records exist.
+- Confirm downloaded CSV files open correctly.
+- Confirm non-admin users cannot access `/api/admin/exports` or `/api/admin/exports/download`.
+- Confirm no new SQL migration or Vercel ENV is required.

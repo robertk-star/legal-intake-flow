@@ -53,6 +53,7 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 | `/admin/notifications` | Email notification log — delivery status for login links and lead assignment notifications |
 | `/admin/reports` | Reporting dashboard — lead volume, assignment performance, partner activity, coverage gaps, notifications |
 | `/admin/system-check` | Production QA system check — required ENV, table/column probes, safety assumptions |
+| `/admin/exports` | Data Export Center — controlled CSV exports for leads, partners, billing, invoices, notifications, and audit review |
 | `/admin/billing` | Billing readiness review — mark assigned leads billable, invoiced, waived, disputed, etc. |
 | `/admin/billing/statements` | Partner billing statements — date-range summaries and CSV export for reviewed billable/invoiced leads |
 
@@ -856,3 +857,45 @@ Filters include category, search, start date, and end date.
 No new SQL migration is required for Phase 27.
 
 No new Vercel environment variable is required for Phase 27.
+
+
+---
+
+## Phase 28 — Admin Data Export Center
+
+Phase 28 adds a controlled CSV export center for internal admin use.
+
+### Admin Page
+
+- `/admin/exports` — choose an export dataset, date range, optional partner/status filters, and row limit.
+
+### Export APIs
+
+- `GET /api/admin/exports` — returns export catalog metadata.
+- `GET /api/admin/exports/download` — returns CSV download for the selected dataset.
+
+### Supported Export Datasets
+
+- Leads
+- Partner Accounts
+- Partner Users
+- Invoices
+- Invoice Items
+- Lead Billing Events
+- Invoice Events
+- Invoice Disputes
+- Email Notifications
+- Partner Profile Events
+
+### Setup
+
+No new SQL migration is required for Phase 28.
+
+No new Vercel environment variable is required for Phase 28.
+
+### Safety Notes
+
+- All export routes require admin authentication.
+- CSV values that could be interpreted as spreadsheet formulas are escaped.
+- Exports are capped at a maximum row limit to avoid accidental large downloads.
+- No public claimant intake, Stripe, payment processing, DBS frontend code, or automatic routing was added.
