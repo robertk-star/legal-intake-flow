@@ -421,3 +421,52 @@ Use it after deployments, SQL migrations, Vercel environment variable changes, a
 No new SQL migration is required for Phase 16.
 
 No new Vercel environment variables are required for Phase 16.
+
+---
+
+## Billing Readiness
+
+Phase 17 adds internal billing-readiness review. This is **not** payment processing and does not add Stripe, invoices, automatic charges, or partner payment collection.
+
+### Admin billing page
+
+Admins can open:
+
+```
+/admin/billing
+```
+
+The page helps admin review assigned partner leads and track whether each lead is:
+
+- not reviewed
+- review needed
+- not billable
+- billable
+- invoiced
+- waived
+- disputed
+
+It also shows a partner billing snapshot and recent billing audit events.
+
+### API routes
+
+```
+GET /api/admin/billing
+PATCH /api/admin/billing/leads/[id]
+```
+
+Both routes are admin-auth protected.
+
+### SQL migration
+
+Run this migration before testing Phase 17:
+
+```
+sql/section13_billing_readiness.sql
+```
+
+This migration adds billing-readiness fields to `public.leads` and creates the `public.lead_billing_events` audit table.
+
+### Environment variables
+
+No new Vercel environment variables are required for Phase 17.

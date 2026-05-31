@@ -81,3 +81,17 @@ Use this checklist after each deployment and after every new SQL migration or Ve
 - Confirm partner pages require partner login.
 - Confirm a partner cannot see another partner account's assigned leads.
 - Confirm no `.env.local`, `.next`, `node_modules`, or TypeScript build info files are committed.
+
+---
+
+## Phase 17 — Billing Readiness QA
+
+1. Run `sql/section13_billing_readiness.sql` in Supabase.
+2. Open `/admin/billing` as admin.
+3. Confirm assigned partner leads load.
+4. Open a lead with **Review**.
+5. Change billable status to `billable`.
+6. Add a billing amount and internal billing notes.
+7. Save and confirm the row updates.
+8. Confirm recent billing event appears on the page.
+9. Confirm no invoice, Stripe payment, or automatic charge is created.

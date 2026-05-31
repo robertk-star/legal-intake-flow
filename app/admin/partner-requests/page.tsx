@@ -686,6 +686,7 @@ export default function AdminPartnerRequestsPage() {
             <a href="/admin/leads" className="text-sm text-gray-300 hover:text-white">Lead Queue</a>
             <a href="/admin/notifications" className="text-sm text-gray-300 hover:text-white">Notifications</a>
             <a href="/admin/reports" className="text-sm text-gray-300 hover:text-white">Reports</a>
+            <a href="/admin/billing" className="text-sm text-gray-300 hover:text-white">Billing</a>
             <a href="/admin/system-check" className="text-sm text-gray-300 hover:text-white">System Check</a>
             <button
               onClick={handleLogout}
