@@ -8,6 +8,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import Image from "next/image";
 import PartnerLogoutButton from "./LogoutButton";
 import LeadPreferencesForm, { type LeadPreferences } from "./LeadPreferencesForm";
+import PartnerProfileForm, { type PartnerProfileSettings } from "./PartnerProfileForm";
 
 interface PartnerAccount {
   id: string;
@@ -33,6 +34,16 @@ interface PartnerAccount {
   accepts_hearings:        boolean | null;
   accepts_child_cases:     boolean | null;
   lead_notes:              string | null;
+  profile_updated_at: string | null;
+  billing_contact_name: string | null;
+  billing_contact_email: string | null;
+  billing_contact_phone: string | null;
+  billing_address_line1: string | null;
+  billing_address_line2: string | null;
+  billing_city: string | null;
+  billing_state: string | null;
+  billing_zip: string | null;
+  billing_notes: string | null;
 }
 
 interface PartnerUser {
@@ -77,6 +88,8 @@ export default async function PartnerAccountPage() {
     .select(
       "id, firm_name, contact_first_name, contact_last_name, email, phone, website, " +
       "states_served, practice_area, monthly_lead_capacity, routing_states, status, last_login_at, created_at, " +
+      "profile_updated_at, billing_contact_name, billing_contact_email, billing_contact_phone, " +
+      "billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_notes, " +
       "accepting_leads, lead_status, accepted_case_types, accepted_languages, " +
       "accepts_initial_filings, accepts_appeals, accepts_hearings, accepts_child_cases, lead_notes"
     )
@@ -111,6 +124,26 @@ export default async function PartnerAccountPage() {
     accepts_hearings:        partner.accepts_hearings        ?? false,
     accepts_child_cases:     partner.accepts_child_cases     ?? false,
     lead_notes:              partner.lead_notes              ?? null,
+  };
+
+  const initialProfile: PartnerProfileSettings = {
+    firm_name: partner.firm_name,
+    contact_first_name: partner.contact_first_name,
+    contact_last_name: partner.contact_last_name,
+    phone: partner.phone,
+    website: partner.website,
+    states_served: partner.states_served,
+    practice_area: partner.practice_area,
+    billing_contact_name: partner.billing_contact_name,
+    billing_contact_email: partner.billing_contact_email,
+    billing_contact_phone: partner.billing_contact_phone,
+    billing_address_line1: partner.billing_address_line1,
+    billing_address_line2: partner.billing_address_line2,
+    billing_city: partner.billing_city,
+    billing_state: partner.billing_state,
+    billing_zip: partner.billing_zip,
+    billing_notes: partner.billing_notes,
+    profile_updated_at: partner.profile_updated_at,
   };
 
   // Display name: prefer user record, fall back to account contact name
@@ -279,6 +312,8 @@ export default async function PartnerAccountPage() {
         </div>
 
         {/* Lead Preferences */}
+        <PartnerProfileForm initialProfile={initialProfile} role={role} />
+
         <LeadPreferencesForm initialPreferences={initialPreferences} />
       </main>
     </div>

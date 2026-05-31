@@ -766,3 +766,32 @@ Notes:
 - Invitation emails use the existing Resend setup from Phase 14.
 - If email is not configured, the invite route returns the one-time login link so it can be copied manually.
 - No Stripe, payment processing, public LIF intake, or DBS frontend code is added.
+
+## Phase 25 — Partner Firm Profile & Billing Contact Settings
+
+Phase 25 lets partner owner/admin users maintain their own firm profile and billing contact details from the partner account page.
+
+Updated partner page:
+
+| Route | Purpose |
+|---|---|
+| `/partner/account` | Shows editable Firm Profile & Billing Contact card for owner/admin users |
+
+New partner API route:
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/partner/profile` | `PATCH` | Owner/admin users update firm profile and billing contact fields for their own partner account |
+
+SQL migration:
+
+| File | Purpose |
+|---|---|
+| `sql/section19_partner_profile_billing_contacts.sql` | Adds billing contact, billing address, and profile update tracking fields to `partner_accounts` |
+
+Notes:
+
+- Owner/admin partner users can edit firm profile and billing contact details.
+- Staff/viewer partner users can view these fields but cannot edit them.
+- Admin partner management now displays the partner-maintained billing contact details.
+- This phase does not add Stripe, payment processing, automatic charges, public LIF intake, or DBS frontend code.

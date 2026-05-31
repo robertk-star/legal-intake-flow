@@ -22,6 +22,16 @@ interface PartnerAccount {
   practice_area: string | null;
   monthly_lead_capacity: string | null;
   routing_states?: string[] | null;
+  profile_updated_at?: string | null;
+  billing_contact_name?: string | null;
+  billing_contact_email?: string | null;
+  billing_contact_phone?: string | null;
+  billing_address_line1?: string | null;
+  billing_address_line2?: string | null;
+  billing_city?: string | null;
+  billing_state?: string | null;
+  billing_zip?: string | null;
+  billing_notes?: string | null;
   status: AccountStatus;
   accepting_leads: boolean | null;
   lead_status: LeadStatus | null;
@@ -578,6 +588,23 @@ function PartnerDetailModal({
               <PrefRow label="Monthly Capacity" value={partner.monthly_lead_capacity} />
               <PrefRow label="Last Login"       value={formatDateTime(partner.last_login_at)} />
               <PrefRow label="Created"          value={formatDate(partner.created_at)} />
+            </div>
+          </section>
+
+          {/* Billing Contact */}
+          <section>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Billing Contact</h3>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              <PrefRow label="Billing Name"     value={partner.billing_contact_name ?? "—"} />
+              <PrefRow label="Billing Email"    value={partner.billing_contact_email ?? "—"} />
+              <PrefRow label="Billing Phone"    value={partner.billing_contact_phone ?? "—"} />
+              <PrefRow label="Address Line 1"   value={partner.billing_address_line1 ?? "—"} />
+              <PrefRow label="Address Line 2"   value={partner.billing_address_line2 ?? "—"} />
+              <PrefRow label="City"             value={partner.billing_city ?? "—"} />
+              <PrefRow label="State"            value={partner.billing_state ?? "—"} />
+              <PrefRow label="ZIP"              value={partner.billing_zip ?? "—"} />
+              <PrefRow label="Profile Updated"  value={formatDateTime(partner.profile_updated_at ?? null)} />
+              <PrefRow label="Billing Notes"    value={partner.billing_notes ?? "—"} />
             </div>
           </section>
 

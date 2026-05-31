@@ -85,9 +85,9 @@ const TABLE_PROBES: TableProbe[] = [
   },
   {
     key: "partner_accounts",
-    label: "Partner accounts + preferences/routing",
+    label: "Partner accounts + preferences/routing/profile",
     table: "partner_accounts",
-    select: "id, status, accepting_leads, lead_status, routing_states",
+    select: "id, status, accepting_leads, lead_status, routing_states, billing_contact_email, billing_address_line1, profile_updated_at",
     required: true,
   },
   {

@@ -202,3 +202,21 @@ Test checklist:
 8. Confirm owner/admin can edit role/status.
 9. Confirm staff/viewer users can view the team list but cannot add/edit/send invitations.
 10. Confirm the system prevents removing the last active/pending owner.
+
+## Phase 25 — Partner Firm Profile & Billing Contact QA
+
+Required setup:
+
+- Run `sql/section19_partner_profile_billing_contacts.sql` in Supabase.
+- No new Vercel environment variable is required.
+
+Checks:
+
+1. Log in as a partner owner/admin.
+2. Open `/partner/account`.
+3. Confirm the Firm Profile & Billing Contact card appears.
+4. Update firm phone, website, billing contact name/email, billing address, and billing notes.
+5. Save and confirm the success message appears.
+6. Reload the page and confirm the saved values persist.
+7. Log in as a staff/viewer partner user and confirm the fields are visible but disabled.
+8. Open `/admin/partners`, view the partner account, and confirm the billing contact section shows the partner-maintained values.

@@ -1,0 +1,133 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedPartnerSession } from "@/lib/partnerAuth";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+const PROFILE_EDIT_ROLES = ["owner", "admin"] as const;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function cleanString(value: unknown, maxLength = 500): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return null;
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  return cleaned.slice(0, maxLength);
+}
+
+function isValidEmail(value: string | null): boolean {
+  if (!value) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function isValidState(value: string | null): boolean {
+  if (!value) return true;
+  return /^[A-Z]{2}$/.test(value);
+}
+
+/**
+ * PATCH /api/partner/profile
+ *
+ * Allows partner owner/admin users to update firm profile and billing contact
+ * settings for their own partner account only.
+ */
+export async function PATCH(request: NextRequest) {
+  const session = await getAuthenticatedPartnerSession();
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized. Please log in again." }, { status: 401 });
+  }
+
+  if (!PROFILE_EDIT_ROLES.includes(session.role as typeof PROFILE_EDIT_ROLES[number])) {
+    return NextResponse.json(
+      { success: false, error: "Only owner or admin users can update firm profile settings." },
+      { status: 403 }
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ success: false, error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  if (!isPlainObject(body)) {
+    return NextResponse.json({ success: false, error: "Request body must be a JSON object." }, { status: 400 });
+  }
+
+  const firmName = cleanString(body.firm_name, 200);
+  const contactFirstName = cleanString(body.contact_first_name, 100);
+  const contactLastName = cleanString(body.contact_last_name, 100);
+  const phone = cleanString(body.phone, 50);
+  const website = cleanString(body.website, 300);
+  const statesServed = cleanString(body.states_served, 500);
+  const practiceArea = cleanString(body.practice_area, 300);
+  const billingContactName = cleanString(body.billing_contact_name, 200);
+  const billingContactEmail = cleanString(body.billing_contact_email, 200)?.toLowerCase() ?? null;
+  const billingContactPhone = cleanString(body.billing_contact_phone, 50);
+  const billingAddressLine1 = cleanString(body.billing_address_line1, 300);
+  const billingAddressLine2 = cleanString(body.billing_address_line2, 300);
+  const billingCity = cleanString(body.billing_city, 150);
+  const billingStateRaw = typeof body.billing_state === "string" ? body.billing_state.trim().toUpperCase() : null;
+  const billingState = billingStateRaw || null;
+  const billingZip = cleanString(body.billing_zip, 20);
+  const billingNotes = cleanString(body.billing_notes, 1000);
+
+  const errors: string[] = [];
+  if (!firmName) errors.push("Firm name is required.");
+  if (!contactFirstName) errors.push("Contact first name is required.");
+  if (!contactLastName) errors.push("Contact last name is required.");
+  if (!phone) errors.push("Phone is required.");
+  if (!statesServed) errors.push("States served is required.");
+  if (!practiceArea) errors.push("Practice area is required.");
+  if (!isValidEmail(billingContactEmail)) errors.push("Billing contact email must be a valid email address.");
+  if (!isValidState(billingState)) errors.push("Billing state must be a two-letter state abbreviation.");
+
+  if (website && !/^https?:\/\//i.test(website)) {
+    errors.push("Website must start with http:// or https://.");
+  }
+
+  if (errors.length > 0) {
+    return NextResponse.json({ success: false, error: "Validation failed.", details: errors }, { status: 422 });
+  }
+
+  const update = {
+    firm_name: firmName,
+    contact_first_name: contactFirstName,
+    contact_last_name: contactLastName,
+    phone,
+    website,
+    states_served: statesServed,
+    practice_area: practiceArea,
+    billing_contact_name: billingContactName,
+    billing_contact_email: billingContactEmail,
+    billing_contact_phone: billingContactPhone,
+    billing_address_line1: billingAddressLine1,
+    billing_address_line2: billingAddressLine2,
+    billing_city: billingCity,
+    billing_state: billingState,
+    billing_zip: billingZip,
+    billing_notes: billingNotes,
+    profile_updated_at: new Date().toISOString(),
+    profile_updated_by_partner_user_id: session.partnerUserId,
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from("partner_accounts")
+    .update(update)
+    .eq("id", session.partnerAccountId)
+    .select(
+      "id, firm_name, contact_first_name, contact_last_name, phone, website, states_served, practice_area, " +
+      "billing_contact_name, billing_contact_email, billing_contact_phone, billing_address_line1, billing_address_line2, " +
+      "billing_city, billing_state, billing_zip, billing_notes, profile_updated_at, profile_updated_by_partner_user_id"
+    )
+    .single();
+
+  if (error || !data) {
+    console.error("[PATCH /api/partner/profile] Supabase error:", error);
+    return NextResponse.json({ success: false, error: "Failed to save firm profile settings." }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, data });
+}
