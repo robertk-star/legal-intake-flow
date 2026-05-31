@@ -31,6 +31,10 @@ interface InvoiceRow {
   voided_at: string | null;
   invoice_email_sent_at: string | null;
   invoice_email_count: number | null;
+  due_date: string | null;
+  reminder_sent_at: string | null;
+  reminder_count: number | null;
+  overdue_marked_at: string | null;
 }
 
 interface InvoiceDetail extends InvoiceRow {
@@ -121,6 +125,7 @@ function CreateInvoiceModal({ partners, onClose, onCreated }: { partners: Partne
     }
   }
 
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8">
       <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
@@ -171,11 +176,15 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
   const [status, setStatus] = useState<InvoiceStatus>("draft");
   const [amountPaid, setAmountPaid] = useState("");
   const [notes, setNotes] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailMessage, setEmailMessage] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [reminderSending, setReminderSending] = useState(false);
+  const [reminderMessage, setReminderMessage] = useState<string | null>(null);
+  const [reminderError, setReminderError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -192,6 +201,7 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
     setStatus(loaded.status);
     setAmountPaid((loaded.amount_paid_cents / 100).toFixed(2));
     setNotes(loaded.notes ?? "");
+    setDueDate(loaded.due_date ?? "");
     setLoading(false);
   }, [invoiceId]);
 
@@ -205,7 +215,7 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
       const res = await fetch(`/api/admin/billing/invoices/${invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, amount_paid: amountPaid, notes }),
+        body: JSON.stringify({ status, amount_paid: amountPaid, notes, due_date: dueDate || null }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -248,6 +258,33 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
     }
   }
 
+
+  async function sendInvoiceReminder() {
+    if (!invoice) return;
+    setReminderSending(true);
+    setReminderError(null);
+    setReminderMessage(null);
+    try {
+      const res = await fetch(`/api/admin/billing/invoices/${invoice.id}/send-reminder`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setReminderError(data.error ?? "Failed to send invoice reminder.");
+        return;
+      }
+      const sent = data.data?.sent ?? 0;
+      const skipped = data.data?.skipped ?? 0;
+      const failed = data.data?.failed ?? 0;
+      setReminderMessage(`Invoice reminder sent to ${sent} recipient${sent === 1 ? "" : "s"}. Skipped: ${skipped}. Failed: ${failed}.`);
+      await load();
+      onUpdated();
+    } catch {
+      setReminderError("Network error while sending invoice reminder.");
+    } finally {
+      setReminderSending(false);
+    }
+  }
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8">
       <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl">
@@ -263,21 +300,23 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
           {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           {invoice && (
             <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
                 <StatCard label="Total" value={currency(invoice.total_cents)} />
                 <StatCard label="Paid" value={currency(invoice.amount_paid_cents)} />
                 <StatCard label="Balance" value={currency(invoice.balance_due_cents)} />
                 <StatCard label="Email Count" value={invoice.invoice_email_count ?? 0} />
+                <StatCard label="Reminders" value={invoice.reminder_count ?? 0} />
                 <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Status</p><div className="mt-3"><StatusBadge status={invoice.status} /></div></div>
               </div>
 
               <section className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Admin Updates</h3>
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
                   <select value={status} onChange={(e) => setStatus(e.target.value as InvoiceStatus)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
                     {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
                   <input value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Amount paid" />
+                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" title="Invoice due date" />
                   <a href={`/api/admin/billing/invoices/${invoice.id}/export`} className="rounded-lg border border-[#1a3a5c] px-4 py-2 text-center text-sm font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white">Export CSV</a>
                 </div>
                 <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Invoice notes…" />
@@ -303,6 +342,29 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
                 </div>
                 {emailMessage && <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">{emailMessage}</p>}
                 {emailError && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{emailError}</p>}
+              </section>
+
+              <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-700">Invoice Reminder</h3>
+                    <p className="mt-1 text-sm text-amber-800">
+                      Due date: {formatDate(invoice.due_date)}. Last reminder: {formatDateTime(invoice.reminder_sent_at)}.
+                    </p>
+                    {invoice.due_date && invoice.balance_due_cents > 0 && ["sent", "partially_paid"].includes(invoice.status) && invoice.due_date < new Date().toISOString().slice(0, 10) && (
+                      <p className="mt-1 text-xs font-semibold text-red-700">This invoice is overdue.</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={sendInvoiceReminder}
+                    disabled={reminderSending || invoice.status === "void" || invoice.status === "paid" || invoice.balance_due_cents <= 0}
+                    className="rounded-lg bg-[#1a3a5c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0d1b2e] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {reminderSending ? "Sending…" : "Send Reminder"}
+                  </button>
+                </div>
+                {reminderMessage && <p className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">{reminderMessage}</p>}
+                {reminderError && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{reminderError}</p>}
               </section>
 
               <section>
@@ -373,8 +435,9 @@ export default function AdminInvoicesPage() {
       acc.totalCents += inv.total_cents ?? 0;
       if (inv.status === "draft") acc.draft += 1;
       if (inv.status === "paid") acc.paid += 1;
+      if (inv.due_date && inv.balance_due_cents > 0 && ["sent", "partially_paid"].includes(inv.status) && inv.due_date < new Date().toISOString().slice(0, 10)) acc.overdue += 1;
       return acc;
-    }, { total: 0, draft: 0, paid: 0, totalCents: 0, balance: 0 });
+    }, { total: 0, draft: 0, paid: 0, overdue: 0, totalCents: 0, balance: 0 });
   }, [invoices]);
 
   return (
@@ -386,7 +449,7 @@ export default function AdminInvoicesPage() {
         </div>
       </header>
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4"><StatCard label="Invoices" value={summary.total} /><StatCard label="Drafts" value={summary.draft} /><StatCard label="Total" value={currency(summary.totalCents)} /><StatCard label="Balance Due" value={currency(summary.balance)} /></div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4"><StatCard label="Invoices" value={summary.total} /><StatCard label="Drafts" value={summary.draft} /><StatCard label="Overdue" value={summary.overdue} /><StatCard label="Total" value={currency(summary.totalCents)} /><StatCard label="Balance Due" value={currency(summary.balance)} /></div>
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
             <select value={partnerFilter} onChange={(e) => setPartnerFilter(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="">All Partners</option>{partners.map((p) => <option key={p.id} value={p.id}>{p.firm_name}</option>)}</select>
@@ -398,7 +461,7 @@ export default function AdminInvoicesPage() {
         {error && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           {loading ? <p className="py-12 text-center text-sm text-gray-400">Loading invoices…</p> : invoices.length === 0 ? <p className="py-12 text-center text-sm text-gray-500">No invoices found.</p> : (
-            <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-4 py-3 text-left">Invoice</th><th className="px-4 py-3 text-left">Partner</th><th className="px-4 py-3 text-left">Period</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3 text-left">Actions</th></tr></thead><tbody className="divide-y divide-gray-100">{invoices.map((invoice) => <tr key={invoice.id} className="hover:bg-gray-50"><td className="px-4 py-3 font-semibold text-[#0d1b2e]">{invoice.invoice_number}<div className="text-xs font-normal text-gray-400">{formatDate(invoice.created_at)}</div></td><td className="px-4 py-3 text-gray-700">{invoice.partner_firm_name}</td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.period_start)} – {formatDate(invoice.period_end)}</td><td className="px-4 py-3"><StatusBadge status={invoice.status} /></td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.total_cents)}</td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.balance_due_cents)}</td><td className="px-4 py-3"><button onClick={() => setSelectedInvoiceId(invoice.id)} className="rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white">View</button></td></tr>)}</tbody></table></div>
+            <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-4 py-3 text-left">Invoice</th><th className="px-4 py-3 text-left">Partner</th><th className="px-4 py-3 text-left">Period</th><th className="px-4 py-3 text-left">Due</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3 text-left">Actions</th></tr></thead><tbody className="divide-y divide-gray-100">{invoices.map((invoice) => <tr key={invoice.id} className="hover:bg-gray-50"><td className="px-4 py-3 font-semibold text-[#0d1b2e]">{invoice.invoice_number}<div className="text-xs font-normal text-gray-400">{formatDate(invoice.created_at)}</div></td><td className="px-4 py-3 text-gray-700">{invoice.partner_firm_name}</td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.period_start)} – {formatDate(invoice.period_end)}</td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.due_date)}{invoice.reminder_count ? <div className="text-xs text-gray-400">{invoice.reminder_count} reminder{invoice.reminder_count === 1 ? "" : "s"}</div> : null}</td><td className="px-4 py-3"><StatusBadge status={invoice.status} /></td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.total_cents)}</td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.balance_due_cents)}</td><td className="px-4 py-3"><button onClick={() => setSelectedInvoiceId(invoice.id)} className="rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white">View</button></td></tr>)}</tbody></table></div>
           )}
         </div>
       </main>

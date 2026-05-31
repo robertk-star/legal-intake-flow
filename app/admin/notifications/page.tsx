@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type NotificationStatus = "queued" | "sent" | "failed" | "skipped";
-type NotificationType = "partner_login_link" | "lead_assigned" | "invoice_sent";
+type NotificationType = "partner_login_link" | "lead_assigned" | "invoice_sent" | "invoice_reminder";
 
 interface EmailNotificationRow {
   id: string;
@@ -43,6 +43,7 @@ const TYPE_LABELS: Record<NotificationType, string> = {
   partner_login_link: "Partner Login Link",
   lead_assigned: "Lead Assigned",
   invoice_sent: "Invoice Sent",
+  invoice_reminder: "Invoice Reminder",
 };
 
 function formatDateTime(iso: string | null) {
@@ -142,6 +143,7 @@ export default function AdminNotificationsPage() {
               <option value="partner_login_link">Partner Login Link</option>
               <option value="lead_assigned">Lead Assigned</option>
               <option value="invoice_sent">Invoice Sent</option>
+              <option value="invoice_reminder">Invoice Reminder</option>
             </select>
             <select
               value={statusFilter}

@@ -3,7 +3,7 @@ import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 const VALID_STATUSES = ["queued", "sent", "failed", "skipped"] as const;
-const VALID_TYPES = ["partner_login_link", "lead_assigned", "invoice_sent"] as const;
+const VALID_TYPES = ["partner_login_link", "lead_assigned", "invoice_sent", "invoice_reminder"] as const;
 
 /**
  * GET /api/admin/notifications

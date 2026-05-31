@@ -18,6 +18,10 @@ interface InvoiceRow {
   notes: string | null;
   sent_at: string | null;
   paid_at: string | null;
+  due_date: string | null;
+  reminder_sent_at: string | null;
+  reminder_count: number | null;
+  overdue_marked_at: string | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -83,8 +87,9 @@ export default function PartnerInvoicesDashboard() {
     acc.total += invoice.total_cents ?? 0;
     acc.balance += invoice.balance_due_cents ?? 0;
     if (invoice.status === "paid") acc.paid += 1;
+    if (invoice.due_date && invoice.balance_due_cents > 0 && ["sent", "partially_paid"].includes(invoice.status) && invoice.due_date < new Date().toISOString().slice(0, 10)) acc.overdue += 1;
     return acc;
-  }, { total: 0, balance: 0, paid: 0 }), [invoices]);
+  }, { total: 0, balance: 0, paid: 0, overdue: 0 }), [invoices]);
 
   return (
     <div className="space-y-6">
@@ -94,6 +99,7 @@ export default function PartnerInvoicesDashboard() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <StatCard label="Invoices" value={invoices.length} />
         <StatCard label="Paid" value={summary.paid} />
+        <StatCard label="Overdue" value={summary.overdue} />
         <StatCard label="Total" value={currency(summary.total)} />
         <StatCard label="Balance Due" value={currency(summary.balance)} />
       </div>
@@ -101,7 +107,7 @@ export default function PartnerInvoicesDashboard() {
       {error && <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         {loading ? <p className="py-12 text-center text-sm text-gray-400">Loading invoices…</p> : invoices.length === 0 ? <div className="py-14 text-center"><p className="text-sm font-medium text-gray-600">No invoices available.</p><p className="mt-1 text-sm text-gray-400">Sent or paid invoice records will appear here.</p></div> : (
-          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-4 py-3 text-left">Invoice</th><th className="px-4 py-3 text-left">Period</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Paid</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3 text-left">Export</th></tr></thead><tbody className="divide-y divide-gray-100">{invoices.map((invoice) => <tr key={invoice.id} className="hover:bg-gray-50"><td className="px-4 py-3 font-semibold text-[#0d1b2e]">{invoice.invoice_number}<div className="text-xs font-normal text-gray-400">Created {formatDate(invoice.created_at)}</div></td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.period_start)} – {formatDate(invoice.period_end)}</td><td className="px-4 py-3"><StatusBadge status={invoice.status} /></td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.total_cents)}</td><td className="px-4 py-3 text-right">{currency(invoice.amount_paid_cents)}</td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.balance_due_cents)}</td><td className="px-4 py-3"><a href={`/api/partner/invoices/${invoice.id}/export`} className="rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white">CSV</a></td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-4 py-3 text-left">Invoice</th><th className="px-4 py-3 text-left">Period</th><th className="px-4 py-3 text-left">Due</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Paid</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3 text-left">Export</th></tr></thead><tbody className="divide-y divide-gray-100">{invoices.map((invoice) => <tr key={invoice.id} className="hover:bg-gray-50"><td className="px-4 py-3 font-semibold text-[#0d1b2e]">{invoice.invoice_number}<div className="text-xs font-normal text-gray-400">Created {formatDate(invoice.created_at)}</div></td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.period_start)} – {formatDate(invoice.period_end)}</td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.due_date)}{invoice.reminder_count ? <div className="text-xs text-gray-400">{invoice.reminder_count} reminder{invoice.reminder_count === 1 ? "" : "s"}</div> : null}</td><td className="px-4 py-3"><StatusBadge status={invoice.status} /></td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.total_cents)}</td><td className="px-4 py-3 text-right">{currency(invoice.amount_paid_cents)}</td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.balance_due_cents)}</td><td className="px-4 py-3"><a href={`/api/partner/invoices/${invoice.id}/export`} className="rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white">CSV</a></td></tr>)}</tbody></table></div>
         )}
       </div>
     </div>

@@ -647,3 +647,61 @@ LIF_APP_URL
 ```
 
 If email is not configured, sends are skipped and logged in `/admin/notifications`.
+
+## Phase 22 — Invoice Reminder & Overdue Tracking
+
+Phase 22 adds invoice due dates, overdue visibility, and invoice reminder email delivery. It does not add Stripe, payment links, payment processing, or automatic charges.
+
+### New SQL migration
+
+Run after deploying Phase 22:
+
+```text
+sql/section16_invoice_reminders_overdue.sql
+```
+
+This migration adds these fields to `partner_billing_invoices`:
+
+- `due_date`
+- `reminder_sent_at`
+- `reminder_count`
+- `overdue_marked_at`
+
+It also allows invoice event types:
+
+- `reminder_sent`
+- `due_date_updated`
+
+### Updated admin invoice tools
+
+Admin can now set an invoice due date and send invoice reminder emails from:
+
+```text
+/admin/billing/invoices
+```
+
+Reminder emails use the existing Resend configuration from Phase 14:
+
+```text
+RESEND_API_KEY
+LIF_EMAIL_FROM
+```
+
+Recommended:
+
+```text
+LIF_EMAIL_REPLY_TO
+LIF_APP_URL
+```
+
+### Updated partner invoice portal
+
+Partners can see invoice due date and reminder count on:
+
+```text
+/partner/invoices
+```
+
+### No new Vercel ENV
+
+No new Vercel environment variable is required for Phase 22 if Phase 14 email is already configured.

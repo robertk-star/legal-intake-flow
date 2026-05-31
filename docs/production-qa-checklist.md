@@ -154,3 +154,18 @@ No Stripe, payment processing, automatic invoice emails, or automatic charges sh
 8. Open `/admin/notifications` and confirm an `Invoice Sent` notification row appears.
 9. Log in as the partner and confirm the invoice remains visible at `/partner/invoices`.
 10. Confirm no Stripe, payment link, automatic charge, or invoice automation was added.
+
+## Phase 22 — Invoice Reminder & Overdue Tracking QA
+
+1. Run `sql/section16_invoice_reminders_overdue.sql` in Supabase.
+2. Open `/admin/billing/invoices`.
+3. Open an invoice with a balance due.
+4. Set or confirm a due date.
+5. Save the invoice.
+6. Click **Send Reminder**.
+7. Confirm the modal shows sent/skipped/failed counts.
+8. Open `/admin/notifications` and confirm an **Invoice Reminder** notification row appears.
+9. Log in as the partner and open `/partner/invoices`.
+10. Confirm due date and reminder count are visible.
+
+No Stripe, payment links, payment processing, automatic charges, public LIF intake, or DBS frontend code should be present.

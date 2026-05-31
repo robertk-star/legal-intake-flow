@@ -100,7 +100,7 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   const currentStatus = String(currentInvoice.status);
-  let eventType: "status_changed" | "payment_recorded" | "payment_adjusted" | "voided" | "note_updated" = "note_updated";
+  let eventType: "status_changed" | "payment_recorded" | "payment_adjusted" | "voided" | "note_updated" | "due_date_updated" = "note_updated";
   let nextStatus: InvoiceStatus | null = null;
   let paymentCents: number | null = null;
 
@@ -148,6 +148,16 @@ export async function PATCH(
     eventType = "payment_recorded";
   }
 
+  if ("due_date" in body) {
+    const dueDate = String(body.due_date ?? "").trim();
+    if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+      return NextResponse.json({ error: "Due date must be in YYYY-MM-DD format." }, { status: 422 });
+    }
+    updates.due_date = dueDate || null;
+    eventType = "due_date_updated";
+    nextStatus = currentStatus as InvoiceStatus;
+  }
+
   if ("notes" in body) {
     const notes = String(body.notes ?? "").trim();
     updates.notes = notes || null;
@@ -176,7 +186,7 @@ export async function PATCH(
     previous_status: currentStatus,
     next_status: resolvedNextStatus,
     amount_cents: paymentCents,
-    notes: typeof body.notes === "string" ? body.notes.trim() || null : null,
+    notes: typeof body.notes === "string" ? body.notes.trim() || null : ("due_date" in body ? `Due date updated to ${String(body.due_date || "not set")}.` : null),
     created_by: "admin",
   });
 

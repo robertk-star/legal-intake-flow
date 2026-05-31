@@ -6,7 +6,8 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 export type EmailNotificationType =
   | "partner_login_link"
   | "lead_assigned"
-  | "invoice_sent";
+  | "invoice_sent"
+  | "invoice_reminder";
 
 export type EmailSendResult = {
   sent: boolean;
@@ -449,6 +450,8 @@ type InvoiceForEmail = {
   amount_paid_cents: number;
   balance_due_cents: number;
   invoice_email_count: number | null;
+  due_date: string | null;
+  reminder_count: number | null;
 };
 
 type InvoiceItemForEmail = {
@@ -684,6 +687,189 @@ export async function sendInvoiceEmailNotifications(input: {
       next_status: invoiceSummary?.status ?? invoice.status,
       amount_cents: invoice.total_cents,
       notes: `Invoice email sent to ${sent} recipient${sent === 1 ? "" : "s"}.`,
+      created_by: "admin",
+    });
+  }
+
+  return {
+    attempted: dedupedUsers.length,
+    sent,
+    skipped,
+    failed,
+    errors,
+    invoice: invoiceSummary,
+  };
+}
+
+
+export async function sendInvoiceReminderNotifications(input: {
+  origin: string;
+  invoiceId: string;
+}) {
+  const { data: invoiceRow, error: invoiceError } = await supabaseAdmin
+    .from("partner_billing_invoices")
+    .select(
+      "id, partner_account_id, invoice_number, status, period_start, period_end, " +
+      "subtotal_cents, total_cents, amount_paid_cents, balance_due_cents, invoice_email_count, " +
+      "due_date, reminder_count"
+    )
+    .eq("id", input.invoiceId)
+    .single();
+
+  if (invoiceError || !invoiceRow) {
+    console.error("[sendInvoiceReminderNotifications] Invoice lookup failed:", invoiceError);
+    return { attempted: 0, sent: 0, skipped: 0, failed: 0, errors: ["Invoice lookup failed."] };
+  }
+
+  const invoice = invoiceRow as unknown as InvoiceForEmail;
+
+  if (!["sent", "partially_paid"].includes(invoice.status)) {
+    return { attempted: 0, sent: 0, skipped: 0, failed: 0, errors: ["Invoice must be sent or partially paid before reminders can be sent."] };
+  }
+
+  if ((invoice.balance_due_cents ?? 0) <= 0) {
+    return { attempted: 0, sent: 0, skipped: 0, failed: 0, errors: ["Invoice has no balance due."] };
+  }
+
+  const { data: accountRow, error: accountError } = await supabaseAdmin
+    .from("partner_accounts")
+    .select("id, firm_name, email, status")
+    .eq("id", invoice.partner_account_id)
+    .single();
+
+  if (accountError || !accountRow) {
+    console.error("[sendInvoiceReminderNotifications] Partner account lookup failed:", accountError);
+    return { attempted: 0, sent: 0, skipped: 0, failed: 0, errors: ["Partner account lookup failed."] };
+  }
+
+  const { data: userRows, error: usersError } = await supabaseAdmin
+    .from("partner_users")
+    .select("id, partner_account_id, email, first_name, last_name, role, status")
+    .eq("partner_account_id", invoice.partner_account_id)
+    .eq("status", "active")
+    .in("role", ["owner", "admin"]);
+
+  if (usersError) {
+    console.error("[sendInvoiceReminderNotifications] Partner users lookup failed:", usersError);
+    return { attempted: 0, sent: 0, skipped: 0, failed: 0, errors: ["Partner user lookup failed."] };
+  }
+
+  const partnerUsers = ((userRows ?? []) as unknown as PartnerUserForEmail[])
+    .filter((user) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email));
+
+  const dedupedUsers = Array.from(
+    new Map(partnerUsers.map((user) => [user.email.toLowerCase(), user])).values()
+  );
+
+  if (dedupedUsers.length === 0) {
+    return { attempted: 0, sent: 0, skipped: 0, failed: 0, errors: ["No active owner/admin partner users found."] };
+  }
+
+  const account = accountRow as unknown as PartnerAccountForEmail;
+  const invoiceUrl = `${input.origin}/partner/invoices`;
+  const dueDate = invoice.due_date ? formatDate(invoice.due_date) : "not set";
+  const today = new Date().toISOString().slice(0, 10);
+  const isOverdue = Boolean(invoice.due_date && invoice.due_date < today);
+  const subject = isOverdue
+    ? `Reminder: Legal Intake Flow invoice ${invoice.invoice_number} is overdue`
+    : `Reminder: Legal Intake Flow invoice ${invoice.invoice_number}`;
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const user of dedupedUsers) {
+    const name = displayName(user.first_name, user.last_name) ?? "Partner";
+    const text = [
+      `Hello ${name},`,
+      "",
+      `This is a reminder that invoice ${invoice.invoice_number} for ${account.firm_name} has a remaining balance.`,
+      "",
+      `Due Date: ${dueDate}`,
+      `Total: ${currency(invoice.total_cents)}`,
+      `Amount Paid: ${currency(invoice.amount_paid_cents)}`,
+      `Balance Due: ${currency(invoice.balance_due_cents)}`,
+      "",
+      `View invoice details here: ${invoiceUrl}`,
+      "",
+      "This reminder is a billing notice only. It does not process payment or create an automatic charge.",
+    ].join("\n");
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; color: #0d1b2e; line-height: 1.5;">
+        <p>Hello ${escapeHtml(name)},</p>
+        <p>This is a reminder that invoice <strong>${escapeHtml(invoice.invoice_number)}</strong> for <strong>${escapeHtml(account.firm_name)}</strong> has a remaining balance.</p>
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:16px 0;background:#f9fafb;">
+          <p style="margin:0 0 6px 0;"><strong>Due Date:</strong> ${escapeHtml(dueDate)}${isOverdue ? ' <span style="color:#b91c1c;font-weight:600;">(overdue)</span>' : ""}</p>
+          <p style="margin:0 0 6px 0;"><strong>Total:</strong> ${escapeHtml(currency(invoice.total_cents))}</p>
+          <p style="margin:0 0 6px 0;"><strong>Amount Paid:</strong> ${escapeHtml(currency(invoice.amount_paid_cents))}</p>
+          <p style="margin:0;"><strong>Balance Due:</strong> ${escapeHtml(currency(invoice.balance_due_cents))}</p>
+        </div>
+        <p>
+          <a href="${escapeHtml(invoiceUrl)}" style="display:inline-block;background:#1a3a5c;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">
+            View Invoice
+          </a>
+        </p>
+        <p style="font-size:13px;color:#4b5563;">This reminder is a billing notice only. It does not process payment or create an automatic charge.</p>
+      </div>
+    `;
+
+    const result = await sendTransactionalEmail({
+      to: user.email,
+      recipientName: name,
+      subject,
+      text,
+      html,
+      notificationType: "invoice_reminder",
+      partnerAccountId: invoice.partner_account_id,
+      partnerUserId: user.id,
+      invoiceId: invoice.id,
+      metadata: {
+        invoice_number: invoice.invoice_number,
+        due_date: invoice.due_date,
+        total_cents: invoice.total_cents,
+        balance_due_cents: invoice.balance_due_cents,
+        reminder_count_before_send: invoice.reminder_count ?? 0,
+      },
+    });
+
+    if (result.sent) sent += 1;
+    else if (result.skipped) skipped += 1;
+    else {
+      failed += 1;
+      if (result.error) errors.push(result.error);
+    }
+  }
+
+  let invoiceSummary: { id: string; reminder_sent_at: string | null; reminder_count: number | null; overdue_marked_at: string | null } | null = null;
+
+  if (sent > 0) {
+    const now = new Date().toISOString();
+    const { data: updatedInvoice, error: updateError } = await supabaseAdmin
+      .from("partner_billing_invoices")
+      .update({
+        reminder_sent_at: now,
+        reminder_count: (invoice.reminder_count ?? 0) + 1,
+        overdue_marked_at: isOverdue ? now : null,
+      })
+      .eq("id", input.invoiceId)
+      .select("id, reminder_sent_at, reminder_count, overdue_marked_at")
+      .single();
+
+    if (updateError) {
+      console.error("[sendInvoiceReminderNotifications] Failed to update invoice reminder summary:", updateError);
+    } else if (updatedInvoice) {
+      invoiceSummary = updatedInvoice as { id: string; reminder_sent_at: string | null; reminder_count: number | null; overdue_marked_at: string | null };
+    }
+
+    await supabaseAdmin.from("partner_billing_invoice_events").insert({
+      invoice_id: input.invoiceId,
+      event_type: "reminder_sent",
+      previous_status: invoice.status,
+      next_status: invoice.status,
+      amount_cents: invoice.balance_due_cents,
+      notes: `Reminder sent to ${sent} recipient${sent === 1 ? "" : "s"}.`,
       created_by: "admin",
     });
   }

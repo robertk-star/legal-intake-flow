@@ -35,6 +35,12 @@ function toEndOfDayIso(value: string) {
   return `${value}T23:59:59.999Z`;
 }
 
+function addDays(dateValue: string, days: number) {
+  const date = new Date(`${dateValue}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 function leadName(lead: LeadForInvoice) {
   const name = `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim();
   return name || "Unnamed Lead";
@@ -78,7 +84,7 @@ export async function GET(request: Request) {
     .select(
       "id, created_at, updated_at, partner_account_id, invoice_number, status, period_start, period_end, " +
       "subtotal_cents, total_cents, amount_paid_cents, balance_due_cents, notes, sent_at, paid_at, voided_at, " +
-      "invoice_email_sent_at, invoice_email_count"
+      "invoice_email_sent_at, invoice_email_count, due_date, reminder_sent_at, reminder_count, overdue_marked_at"
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -197,6 +203,7 @@ export async function POST(request: Request) {
       amount_paid_cents: 0,
       balance_due_cents: totalCents,
       notes: notes || null,
+      due_date: addDays(periodEnd, 30),
       created_by: "admin",
     })
     .select("*")

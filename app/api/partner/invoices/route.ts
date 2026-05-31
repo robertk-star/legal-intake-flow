@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     .from("partner_billing_invoices")
     .select(
       "id, created_at, updated_at, invoice_number, status, period_start, period_end, " +
-      "subtotal_cents, total_cents, amount_paid_cents, balance_due_cents, notes, sent_at, paid_at"
+      "subtotal_cents, total_cents, amount_paid_cents, balance_due_cents, notes, sent_at, paid_at, due_date, reminder_sent_at, reminder_count, overdue_marked_at"
     )
     .eq("partner_account_id", session.partnerAccountId)
     .order("created_at", { ascending: false })
