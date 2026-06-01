@@ -42,6 +42,12 @@ interface InvoiceRow {
   payment_reference: string | null;
   payment_received_at: string | null;
   payment_recorded_by: string | null;
+  stripe_checkout_session_id: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_payment_status: string | null;
+  stripe_paid_at: string | null;
+  stripe_customer_email: string | null;
+  stripe_last_event_at: string | null;
 }
 
 interface InvoiceDetail extends InvoiceRow {
@@ -357,6 +363,7 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
                 <StatCard label="Finalized" value={formatDate(invoice.finalized_at)} />
                 <StatCard label="Email Count" value={invoice.invoice_email_count ?? 0} />
                 <StatCard label="Reminders" value={invoice.reminder_count ?? 0} />
+                <StatCard label="Stripe" value={invoice.stripe_payment_status ? invoice.stripe_payment_status.replace(/_/g, " ") : "—"} />
                 <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Status</p><div className="mt-3"><StatusBadge status={invoice.status} /></div></div>
               </div>
 
@@ -394,6 +401,21 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
                   <input type="date" value={paymentReceivedAt} onChange={(e) => setPaymentReceivedAt(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm" title="Payment received date" />
                 </div>
                 <textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} rows={4} className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Payment instructions shown to partner, such as check mailing address or ACH instructions." />
+              </section>
+
+              <section className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-purple-700">Stripe Online Payment</h3>
+                <p className="mt-1 text-sm text-purple-800">
+                  Partners can pay sent or partially paid invoices online from the partner invoice portal when Stripe is configured.
+                </p>
+                <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                  <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Payment Status</dt><dd className="mt-1 text-purple-900">{invoice.stripe_payment_status ? invoice.stripe_payment_status.replace(/_/g, " ") : "—"}</dd></div>
+                  <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Stripe Paid At</dt><dd className="mt-1 text-purple-900">{formatDateTime(invoice.stripe_paid_at)}</dd></div>
+                  <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Payment Intent</dt><dd className="mt-1 break-all text-purple-900">{invoice.stripe_payment_intent_id ?? "—"}</dd></div>
+                  <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Checkout Session</dt><dd className="mt-1 break-all text-purple-900">{invoice.stripe_checkout_session_id ?? "—"}</dd></div>
+                  <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Customer Email</dt><dd className="mt-1 break-all text-purple-900">{invoice.stripe_customer_email ?? "—"}</dd></div>
+                  <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Last Stripe Event</dt><dd className="mt-1 text-purple-900">{formatDateTime(invoice.stripe_last_event_at)}</dd></div>
+                </dl>
               </section>
 
               <section className="rounded-xl border border-blue-200 bg-blue-50 p-4">
@@ -516,7 +538,7 @@ export default function AdminInvoicesPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
-          <div><h1 className="text-xl font-bold text-[#0d1b2e]">Invoice Drafts</h1><p className="text-sm text-gray-500">Internal invoice tracking only. No payments or Stripe.</p></div>
+          <div><h1 className="text-xl font-bold text-[#0d1b2e]">Invoice Drafts</h1><p className="text-sm text-gray-500">Invoice drafts, payment tracking, and optional Stripe Checkout payments.</p></div>
           <nav className="flex flex-wrap gap-3 text-sm"><a href="/admin/billing" className="text-gray-600 hover:text-[#0d1b2e]">Billing</a><a href="/admin/billing/disputes" className="text-gray-600 hover:text-[#0d1b2e]">Disputes</a><a href="/admin/billing/statements" className="text-gray-600 hover:text-[#0d1b2e]">Statements</a><a href="/admin/reports" className="text-gray-600 hover:text-[#0d1b2e]">Reports</a>
             <a href="/admin/activity" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Activity</a><a href="/admin/exports" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Exports</a></nav>
         </div>

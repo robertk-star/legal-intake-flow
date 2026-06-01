@@ -100,7 +100,7 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   const currentStatus = String(currentInvoice.status);
-  let eventType: "status_changed" | "payment_recorded" | "payment_adjusted" | "voided" | "note_updated" | "due_date_updated" | "payment_instructions_updated" | "payment_reference_updated" = "note_updated";
+  let eventType: "status_changed" | "payment_recorded" | "payment_adjusted" | "voided" | "note_updated" | "due_date_updated" | "payment_instructions_updated" | "payment_reference_updated" | "stripe_payment_succeeded" = "note_updated";
   let nextStatus: InvoiceStatus | null = null;
   let paymentCents: number | null = null;
 

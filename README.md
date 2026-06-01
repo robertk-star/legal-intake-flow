@@ -1104,3 +1104,61 @@ sql/section22_billing_finalization.sql
 ```
 
 No new Vercel environment variables are required.
+
+## Phase 34 — Stripe Payment Option
+
+Phase 34 adds optional Stripe Checkout payment for finalized/sent partner invoices.
+
+### New routes
+
+- `POST /api/partner/invoices/[id]/checkout` — partner-auth protected; creates a Stripe Checkout Session for the invoice balance due and returns a redirect URL.
+- `POST /api/stripe/webhook` — verifies Stripe webhook signatures and marks invoices paid/partially paid after successful Checkout completion.
+
+### New migration
+
+Run this SQL before testing Phase 34:
+
+```text
+sql/section23_stripe_payment_option.sql
+```
+
+### New environment variables
+
+Add these to Vercel before testing online payments:
+
+```text
+STRIPE_SECRET_KEY=sk_live_or_test_key
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+Optional:
+
+```text
+STRIPE_CURRENCY=usd
+```
+
+`LIF_APP_URL` should also be configured so Stripe can return partners to the correct portal URL after checkout.
+
+### Stripe webhook setup
+
+In Stripe Dashboard, create a webhook endpoint:
+
+```text
+https://legalintakeflow.com/api/stripe/webhook
+```
+
+Recommended event:
+
+```text
+checkout.session.completed
+```
+
+Copy the webhook signing secret into `STRIPE_WEBHOOK_SECRET` in Vercel, then redeploy.
+
+### Behavior
+
+- Partners see a **Pay Online** button on sent or partially paid invoices with a balance due.
+- Clicking Pay Online opens Stripe Checkout.
+- On successful payment, the Stripe webhook updates the invoice payment fields.
+- The invoice event log records `stripe_checkout_created` and `stripe_payment_succeeded` events.
+- No automatic charges are created. The partner must click Pay Online.

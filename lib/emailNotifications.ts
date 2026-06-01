@@ -569,7 +569,7 @@ export async function sendInvoiceEmailNotifications(input: {
       "",
       `View invoice details here: ${invoiceUrl}`,
       "",
-      "This email is a billing notice only. It does not process payment or create an automatic charge.",
+      "This email is a billing notice only. If online payment is enabled, you can open the invoice portal and click Pay Online. No automatic charge is created by this email.",
     ].filter((line): line is string => line !== null).join("\n");
 
     const html = `
@@ -602,7 +602,7 @@ export async function sendInvoiceEmailNotifications(input: {
             View Invoice
           </a>
         </p>
-        <p style="font-size:13px;color:#4b5563;">This email is a billing notice only. It does not process payment or create an automatic charge.</p>
+        <p style="font-size:13px;color:#4b5563;">This email is a billing notice only. If online payment is enabled, you can open the invoice portal and click Pay Online. No automatic charge is created by this email.</p>
       </div>
     `;
 

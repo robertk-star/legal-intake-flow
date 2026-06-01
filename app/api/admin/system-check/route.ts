@@ -71,7 +71,17 @@ const RECOMMENDED_ENV = [
   {
     key: "LIF_APP_URL",
     label: "LIF app URL",
-    description: "Recommended for absolute links in emails.",
+    description: "Recommended for absolute links in emails and Stripe Checkout return URLs.",
+  },
+  {
+    key: "STRIPE_SECRET_KEY",
+    label: "Stripe secret key",
+    description: "Required only if online invoice payment is enabled.",
+  },
+  {
+    key: "STRIPE_WEBHOOK_SECRET",
+    label: "Stripe webhook secret",
+    description: "Required for Stripe payment completion webhooks.",
   },
 ];
 
@@ -158,7 +168,7 @@ const TABLE_PROBES: TableProbe[] = [
     key: "partner_billing_invoices",
     label: "Partner billing invoices",
     table: "partner_billing_invoices",
-    select: "id, partner_account_id, invoice_number, status, invoice_email_sent_at, invoice_email_count, due_date, reminder_sent_at, reminder_count, finalized_at, payment_instructions, payment_method, payment_reference, payment_received_at",
+    select: "id, partner_account_id, invoice_number, status, invoice_email_sent_at, invoice_email_count, due_date, reminder_sent_at, reminder_count, finalized_at, payment_instructions, payment_method, payment_reference, payment_received_at, stripe_checkout_session_id, stripe_payment_intent_id, stripe_payment_status, stripe_paid_at",
     required: true,
   },
   {

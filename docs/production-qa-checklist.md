@@ -352,3 +352,25 @@ Safety checks:
 10. Export invoice CSV from admin and partner views and confirm finalization/payment-reference fields appear.
 
 No Stripe/payment processing should be present.
+
+## Phase 34 — Stripe Payment Option QA
+
+Before testing:
+
+1. Run `sql/section23_stripe_payment_option.sql` in Supabase.
+2. Add `STRIPE_SECRET_KEY` in Vercel.
+3. Add `STRIPE_WEBHOOK_SECRET` in Vercel.
+4. Confirm `LIF_APP_URL=https://legalintakeflow.com` is set.
+5. Redeploy LIF.
+6. Configure Stripe webhook endpoint: `https://legalintakeflow.com/api/stripe/webhook` for `checkout.session.completed`.
+
+Test flow:
+
+1. Create/finalize/send an invoice with a balance due.
+2. Log in as the partner.
+3. Open `/partner/invoices`.
+4. Click **Pay Online**.
+5. Complete payment with a Stripe test card if using test mode.
+6. Return to `/partner/invoices`.
+7. Confirm invoice status updates to paid or partially paid after webhook processing.
+8. Confirm admin invoice detail shows Stripe payment status, payment intent, and invoice event log entry.

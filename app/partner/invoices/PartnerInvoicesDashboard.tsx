@@ -29,6 +29,12 @@ interface InvoiceRow {
   payment_method: string | null;
   payment_reference: string | null;
   payment_received_at: string | null;
+  stripe_checkout_session_id: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_payment_status: string | null;
+  stripe_paid_at: string | null;
+  stripe_customer_email: string | null;
+  stripe_last_event_at: string | null;
 }
 
 interface InvoiceDispute {
@@ -173,6 +179,8 @@ export default function PartnerInvoicesDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDisputeInvoice, setSelectedDisputeInvoice] = useState<InvoiceRow | null>(null);
+  const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -224,16 +232,44 @@ export default function PartnerInvoicesDashboard() {
 
   const openDisputes = disputes.filter((dispute) => dispute.status === "open" || dispute.status === "in_review").length;
 
+  async function startStripeCheckout(invoice: InvoiceRow) {
+    setPaymentError(null);
+    setPayingInvoiceId(invoice.id);
+    try {
+      const res = await fetch(`/api/partner/invoices/${invoice.id}/checkout`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPaymentError(data.error ?? "Unable to start online payment.");
+        return;
+      }
+      const url = data.data?.checkoutUrl;
+      if (typeof url !== "string") {
+        setPaymentError("Stripe did not return a checkout URL.");
+        return;
+      }
+      window.location.href = url;
+    } catch {
+      setPaymentError("Network error while starting online payment.");
+    } finally {
+      setPayingInvoiceId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm text-blue-800">
-        This page shows invoice records for review only. Online payment processing is not enabled in Legal Intake Flow yet.
+        This page shows invoice records for your firm. Online card payments are available for sent or partially paid invoices when enabled by Legal Intake Flow.
       </div>
+      {paymentError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+          {paymentError}
+        </div>
+      )}
       {invoices.some((invoice) => invoice.payment_instructions) && (
         <section className="rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-800">
           <h2 className="font-semibold">Payment Instructions</h2>
           <p className="mt-1 whitespace-pre-wrap">{invoices.find((invoice) => invoice.payment_instructions)?.payment_instructions}</p>
-          <p className="mt-2 text-xs text-green-700">Payment is handled outside Legal Intake Flow. Online payments are not enabled in this portal.</p>
+          <p className="mt-2 text-xs text-green-700">You may also see a Pay Online option on invoices when online card payment is available.</p>
         </section>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
@@ -250,7 +286,8 @@ export default function PartnerInvoicesDashboard() {
           <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500"><tr><th className="px-4 py-3 text-left">Invoice</th><th className="px-4 py-3 text-left">Period</th><th className="px-4 py-3 text-left">Due</th><th className="px-4 py-3 text-left">Finalized</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-left">Disputes</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3 text-left">Actions</th></tr></thead><tbody className="divide-y divide-gray-100">{invoices.map((invoice) => {
             const invoiceDisputes = disputesByInvoice.get(invoice.id) ?? [];
             const latestDispute = invoiceDisputes[0];
-            return <tr key={invoice.id} className="hover:bg-gray-50"><td className="px-4 py-3 font-semibold text-[#0d1b2e]">{invoice.invoice_number}<div className="text-xs font-normal text-gray-400">Created {formatDate(invoice.created_at)}</div></td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.period_start)} – {formatDate(invoice.period_end)}</td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.due_date)}{invoice.reminder_count ? <div className="text-xs text-gray-400">{invoice.reminder_count} reminder{invoice.reminder_count === 1 ? "" : "s"}</div> : null}</td><td className="px-4 py-3 text-xs text-gray-500">{formatDate(invoice.finalized_at)}</td><td className="px-4 py-3"><StatusBadge status={invoice.status} /></td><td className="px-4 py-3">{latestDispute ? <div className="space-y-1"><DisputeBadge status={latestDispute.status} /><div className="text-xs text-gray-400">{invoiceDisputes.length} request{invoiceDisputes.length === 1 ? "" : "s"}</div></div> : <span className="text-xs italic text-gray-400">None</span>}</td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.total_cents)}</td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.balance_due_cents)}{invoice.payment_reference ? <div className="text-xs font-normal text-gray-400">Ref: {invoice.payment_reference}</div> : null}</td><td className="space-x-2 px-4 py-3"><a href={`/api/partner/invoices/${invoice.id}/export`} className="rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white">CSV</a><button onClick={() => setSelectedDisputeInvoice(invoice)} className="rounded border border-amber-600 px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">Question</button></td></tr>;
+            const canPayOnline = ["sent", "partially_paid"].includes(invoice.status) && invoice.balance_due_cents > 0;
+            return <tr key={invoice.id} className="hover:bg-gray-50"><td className="px-4 py-3 font-semibold text-[#0d1b2e]">{invoice.invoice_number}<div className="text-xs font-normal text-gray-400">Created {formatDate(invoice.created_at)}</div>{invoice.stripe_payment_status && <div className="text-xs font-normal text-purple-600">Stripe: {invoice.stripe_payment_status.replace(/_/g, " ")}</div>}</td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.period_start)} – {formatDate(invoice.period_end)}</td><td className="px-4 py-3 text-gray-600">{formatDate(invoice.due_date)}{invoice.reminder_count ? <div className="text-xs text-gray-400">{invoice.reminder_count} reminder{invoice.reminder_count === 1 ? "" : "s"}</div> : null}</td><td className="px-4 py-3 text-xs text-gray-500">{formatDate(invoice.finalized_at)}</td><td className="px-4 py-3"><StatusBadge status={invoice.status} /></td><td className="px-4 py-3">{latestDispute ? <div className="space-y-1"><DisputeBadge status={latestDispute.status} /><div className="text-xs text-gray-400">{invoiceDisputes.length} request{invoiceDisputes.length === 1 ? "" : "s"}</div></div> : <span className="text-xs italic text-gray-400">None</span>}</td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.total_cents)}</td><td className="px-4 py-3 text-right font-semibold">{currency(invoice.balance_due_cents)}{invoice.payment_reference ? <div className="text-xs font-normal text-gray-400">Ref: {invoice.payment_reference}</div> : null}</td><td className="space-y-2 px-4 py-3"><div className="flex flex-wrap gap-2"><a href={`/api/partner/invoices/${invoice.id}/export`} className="rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white">CSV</a><button onClick={() => setSelectedDisputeInvoice(invoice)} className="rounded border border-amber-600 px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">Question</button>{canPayOnline && <button onClick={() => startStripeCheckout(invoice)} disabled={payingInvoiceId === invoice.id} className="rounded border border-green-700 bg-green-700 px-2 py-1 text-xs font-semibold text-white hover:bg-green-800 disabled:opacity-50">{payingInvoiceId === invoice.id ? "Opening…" : "Pay Online"}</button>}</div></td></tr>;
           })}</tbody></table></div>
         )}
       </div>
