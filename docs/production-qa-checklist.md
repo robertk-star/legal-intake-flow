@@ -385,3 +385,17 @@ Test flow:
 - Confirm admin invoice detail shows charge ID, payment method, and receipt link.
 - Confirm partner invoice list shows a Receipt link after payment.
 - Confirm no automatic charges are created; partners still must click Pay Online.
+
+## Phase 36 — Security & Compliance Hardening QA
+
+1. Log in as admin and open `/admin/security`.
+2. Confirm the page loads and shows security checks.
+3. Confirm missing/review items do not expose secret values.
+4. Confirm `/api/admin/security` returns 401 when logged out.
+5. Confirm admin and partner pages include `X-Robots-Tag: noindex, nofollow` in response headers.
+6. Confirm repeated failed admin login attempts eventually return HTTP 429.
+7. Confirm repeated partner login requests eventually return HTTP 429.
+8. Confirm Stripe payments and DBS ingestion still work after the middleware/header changes.
+
+No SQL migration is required for Phase 36.
+No new Vercel environment variable is required.

@@ -691,6 +691,7 @@ export default function AdminPartnerRequestsPage() {
             <a href="/admin/billing" className="text-sm text-gray-300 hover:text-white">Billing</a>
             <a href="/admin/billing/statements" className="text-sm text-gray-300 hover:text-white">Statements</a>
             <a href="/admin/system-check" className="text-sm text-gray-300 hover:text-white">System Check</a>
+            <a href="/admin/security" className="text-sm text-gray-300 hover:text-white">Security</a>
             <button
               onClick={handleLogout}
               disabled={loggingOut}

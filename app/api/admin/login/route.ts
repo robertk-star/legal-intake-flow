@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimitResponse } from "@/lib/rateLimit";
 import {
   ADMIN_COOKIE_NAME,
   EIGHT_HOURS_SECONDS,
@@ -6,6 +7,9 @@ import {
 } from "@/lib/adminAuth";
 
 export async function POST(request: Request) {
+  const limited = rateLimitResponse(request, { keyPrefix: "admin-login", limit: 10, windowMs: 10 * 60 * 1000 });
+  if (limited) return limited;
+
   let body: { password?: string } = {};
 
   try {

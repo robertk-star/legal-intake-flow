@@ -205,6 +205,7 @@ export default function AdminActivityPage() {
             <a href="/admin/activity" className="text-sm font-semibold text-[#1a3a5c]">Activity</a>
             <a href="/admin/exports" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Exports</a>
             <a href="/admin/system-check" className="text-sm text-gray-500 hover:text-[#0d1b2e]">System Check</a>
+            <a href="/admin/security" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Security</a>
           </div>
           <form action="/api/admin/logout" method="POST">
             <button type="submit" className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50">

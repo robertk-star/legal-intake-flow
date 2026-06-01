@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimitResponse } from "@/lib/rateLimit";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import {
   createPartnerLoginToken,
@@ -35,6 +36,9 @@ type PartnerAccountLookup = {
  *     for manual handling.
  */
 export async function POST(request: Request) {
+  const limited = rateLimitResponse(request, { keyPrefix: "partner-request-login", limit: 5, windowMs: 15 * 60 * 1000 });
+  if (limited) return limited;
+
   let email: string;
 
   try {

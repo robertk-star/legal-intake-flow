@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimitResponse } from "@/lib/rateLimit";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { assignBestMatchToLead, getLeadAssignmentSettings } from "@/lib/leadAssignmentEngine";
 
@@ -39,6 +40,9 @@ import { assignBestMatchToLead, getLeadAssignmentSettings } from "@/lib/leadAssi
  *   - Returns { success: true, leadId, duplicate: true } on duplicate (HTTP 200)
  */
 export async function POST(request: Request) {
+  const limited = rateLimitResponse(request, { keyPrefix: "dbs-ingest", limit: 120, windowMs: 60 * 1000 });
+  if (limited) return limited;
+
   // ── 1. Authenticate via shared secret ──────────────────────────────────────
   const ingestSecret = process.env.LIF_DBS_INGEST_SECRET;
 

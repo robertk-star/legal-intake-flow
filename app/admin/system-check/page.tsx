@@ -25,6 +25,7 @@ export default async function AdminSystemCheckPage() {
             <a href="/admin/billing" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Billing</a>
             <a href="/admin/billing/disputes" className="text-gray-600 hover:text-[#0d1b2e]">Disputes</a><a href="/admin/billing/statements" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Statements</a>
             <a href="/admin/system-check" className="text-sm font-semibold text-[#1a3a5c]">System Check</a>
+            <a href="/admin/security" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Security</a>
           </div>
           <form action="/api/admin/logout" method="POST">
             <button type="submit" className="text-xs text-gray-400 hover:text-gray-600">Sign Out</button>

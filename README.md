@@ -1188,3 +1188,48 @@ sql/section24_stripe_payment_ux_receipts.sql
 ```
 
 No required new Vercel ENV variables are added. The two Stripe Checkout UX variables are optional.
+
+## Phase 36 — Security & Compliance Hardening
+
+Phase 36 adds a production security hardening pass.
+
+### New routes
+
+- `GET /api/admin/security` — admin-auth protected security posture summary.
+- `/admin/security` — admin security and compliance hardening checklist.
+
+### Security headers
+
+A new Next.js `middleware.ts` adds baseline response headers:
+
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy`
+- `X-DNS-Prefetch-Control: off`
+- `X-Robots-Tag: noindex, nofollow` for admin and partner pages
+
+### Best-effort rate limiting
+
+Sensitive endpoints now use best-effort per-IP rate limiting:
+
+- `POST /api/admin/login`
+- `POST /api/partner/request-login`
+- `POST /api/intake/ingest`
+- `POST /api/partner/invoices/[id]/checkout`
+
+This in-memory limiter is useful as an application-level safety layer, but production traffic should still use Vercel/edge/WAF rate limiting if volume grows.
+
+### Optional environment variable
+
+No new environment variable is required. Optional:
+
+```text
+LIF_RATE_LIMIT_DISABLED=true
+```
+
+Use only for emergency debugging. Leave unset in production.
+
+### SQL
+
+No SQL migration is required for Phase 36.

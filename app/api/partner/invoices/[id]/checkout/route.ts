@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimitResponse } from "@/lib/rateLimit";
 import { getAuthenticatedPartnerSession } from "@/lib/partnerAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { appUrlFromRequest, createStripeCheckoutSession } from "@/lib/stripePayments";
@@ -9,6 +10,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const limited = rateLimitResponse(request, { keyPrefix: "partner-stripe-checkout", limit: 20, windowMs: 10 * 60 * 1000 });
+  if (limited) return limited;
+
   const session = await getAuthenticatedPartnerSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });

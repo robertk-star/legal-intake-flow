@@ -111,6 +111,7 @@ function AdminNav() {
       <a href="/admin/activity" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Activity</a>
       <a href="/admin/exports" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Exports</a>
       <a href="/admin/system-check" className="text-sm text-gray-500 hover:text-[#0d1b2e]">System Check</a>
+            <a href="/admin/security" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Security</a>
     </nav>
   );
 }

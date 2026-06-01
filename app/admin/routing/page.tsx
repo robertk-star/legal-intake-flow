@@ -55,6 +55,7 @@ function AdminNav() {
           <a href="/admin/activity" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Activity</a>
           <a href="/admin/exports" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Exports</a>
           <a href="/admin/system-check" className="text-sm text-gray-500 hover:text-[#0d1b2e]">System Check</a>
+            <a href="/admin/security" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Security</a>
         </div>
         <form action="/api/admin/logout" method="POST">
           <button type="submit" className="text-xs text-gray-400 hover:text-gray-600">Sign Out</button>
