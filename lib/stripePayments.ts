@@ -6,6 +6,22 @@ export type StripeCheckoutSessionResult = {
   paymentStatus?: string | null;
 };
 
+export type StripePaymentIntentDetails = {
+  paymentIntentId: string;
+  chargeId: string | null;
+  receiptUrl: string | null;
+  paymentMethodType: string | null;
+  cardLast4: string | null;
+};
+
+export function stripeCheckoutAllowLink() {
+  return process.env.STRIPE_CHECKOUT_ALLOW_LINK?.trim().toLowerCase() !== "false";
+}
+
+export function stripeCheckoutPrefillEmail() {
+  return process.env.STRIPE_CHECKOUT_PREFILL_EMAIL?.trim().toLowerCase() !== "false";
+}
+
 function getStripeSecretKey() {
   return process.env.STRIPE_SECRET_KEY?.trim() || null;
 }
@@ -54,6 +70,10 @@ export async function createStripeCheckoutSession(input: {
   const appUrl = input.appUrl.replace(/\/$/, "");
   const params = new URLSearchParams();
   appendParam(params, "mode", "payment");
+  if (!stripeCheckoutAllowLink()) {
+    // Restrict Checkout to card payments when operators want to avoid the Stripe Link prompt.
+    appendParam(params, "payment_method_types[0]", "card");
+  }
   appendParam(params, "success_url", `${appUrl}/partner/invoices?payment=success&invoice=${encodeURIComponent(input.invoiceId)}`);
   appendParam(params, "cancel_url", `${appUrl}/partner/invoices?payment=cancelled&invoice=${encodeURIComponent(input.invoiceId)}`);
   appendParam(params, "client_reference_id", input.invoiceId);
@@ -69,7 +89,7 @@ export async function createStripeCheckoutSession(input: {
   appendParam(params, "payment_intent_data[metadata][invoice_number]", input.invoiceNumber);
   appendParam(params, "payment_intent_data[metadata][partner_account_id]", input.partnerAccountId);
 
-  if (input.customerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.customerEmail)) {
+  if (stripeCheckoutPrefillEmail() && input.customerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.customerEmail)) {
     appendParam(params, "customer_email", input.customerEmail);
   }
 
@@ -154,4 +174,51 @@ export function verifyStripeWebhookSignature(input: {
   }
 
   return { ok: true, error: null };
+}
+
+
+export async function retrieveStripePaymentIntentDetails(paymentIntentId: string): Promise<{ data: StripePaymentIntentDetails | null; error: string | null; raw?: unknown }> {
+  const secretKey = getStripeSecretKey();
+  if (!secretKey) {
+    return { data: null, error: "Stripe is not configured. Add STRIPE_SECRET_KEY in Vercel and redeploy." };
+  }
+
+  const encodedId = encodeURIComponent(paymentIntentId);
+  try {
+    const res = await fetch(`https://api.stripe.com/v1/payment_intents/${encodedId}?expand[]=latest_charge`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${secretKey}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message = typeof data?.error?.message === "string"
+        ? data.error.message
+        : `Stripe returned HTTP ${res.status}.`;
+      return { data: null, error: message, raw: data };
+    }
+
+    const latestCharge = data?.latest_charge && typeof data.latest_charge === "object"
+      ? data.latest_charge as Record<string, unknown>
+      : null;
+    const paymentMethodDetails = latestCharge?.payment_method_details && typeof latestCharge.payment_method_details === "object"
+      ? latestCharge.payment_method_details as Record<string, unknown>
+      : null;
+    const card = paymentMethodDetails?.card && typeof paymentMethodDetails.card === "object"
+      ? paymentMethodDetails.card as Record<string, unknown>
+      : null;
+
+    return {
+      data: {
+        paymentIntentId,
+        chargeId: typeof latestCharge?.id === "string" ? latestCharge.id : null,
+        receiptUrl: typeof latestCharge?.receipt_url === "string" ? latestCharge.receipt_url : null,
+        paymentMethodType: typeof paymentMethodDetails?.type === "string" ? paymentMethodDetails.type : null,
+        cardLast4: typeof card?.last4 === "string" ? card.last4 : null,
+      },
+      error: null,
+      raw: data,
+    };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : "Failed to retrieve Stripe payment details." };
+  }
 }
