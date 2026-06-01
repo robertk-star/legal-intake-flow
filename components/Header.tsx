@@ -8,6 +8,7 @@ import { useState } from "react";
 const NAV_LINKS = [
   { href: "/how-it-works", label: "How It Works" },
   { href: "/for-attorneys", label: "For Attorneys" },
+  { href: "/example-reports", label: "Example Reports" },
 ];
 
 export function Header() {

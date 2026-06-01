@@ -98,6 +98,9 @@ export default function HomePage() {
             <Button href="/how-it-works" variant="outline" size="lg">
               How It Works
             </Button>
+            <Link href="/example-reports" className="text-sm font-semibold text-blue-200 hover:text-white hover:underline">
+              View example reports →
+            </Link>
           </div>
         </div>
       </section>
@@ -129,6 +132,30 @@ export default function HomePage() {
             >
               View the full process →
             </Link>
+          </div>
+        </div>
+      </section>
+
+
+
+      {/* ── Example Reports ───────────────────────────────────────────────── */}
+      <section className="bg-white py-16">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-8 text-center shadow-sm">
+            <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-blue-700">
+              See the Intake Format
+            </p>
+            <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">
+              Review Redacted Example Reports
+            </h2>
+            <p className="mx-auto mt-4 max-w-3xl text-gray-700 leading-relaxed">
+              See examples of the organized readiness information partners may receive, including screening responses, consent context, treatment history, daily limitation details, and preparation checklist progress.
+            </p>
+            <div className="mt-8">
+              <Button href="/example-reports" size="lg">
+                View Example Reports
+              </Button>
+            </div>
           </div>
         </div>
       </section>

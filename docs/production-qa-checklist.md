@@ -399,3 +399,14 @@ Test flow:
 
 No SQL migration is required for Phase 36.
 No new Vercel environment variable is required.
+
+## Phase 37 — Example Reports Page QA
+
+- Open `/example-reports`.
+- Confirm the page loads publicly.
+- Confirm all four report cards appear.
+- Open each PDF in a new tab.
+- Confirm the header and footer show an Example Reports link.
+- Confirm the homepage links to the example reports page.
+- Confirm `/for-attorneys` links to the example reports page.
+- Confirm no unredacted personal information is visible in the sample PDFs.

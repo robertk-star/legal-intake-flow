@@ -1233,3 +1233,30 @@ Use only for emergency debugging. Leave unset in production.
 ### SQL
 
 No SQL migration is required for Phase 36.
+
+## Phase 37 — Public Example Reports Page
+
+Phase 37 adds a public marketing page that hosts redacted disability readiness report examples for attorney/advocate prospects.
+
+### New route
+
+- `/example-reports` — public page explaining the type of organized intake information Legal Intake Flow partners may review.
+
+### Hosted report files
+
+The following redacted PDFs are stored under `public/example-reports/`:
+
+- `redacted-readiness-report-1.pdf`
+- `redacted-readiness-report-2.pdf`
+- `redacted-readiness-report-3.pdf`
+- `redacted-readiness-report-4.pdf`
+
+### Navigation updates
+
+The public header/footer now include **Example Reports**. The homepage and For Attorneys page also link to the example reports page.
+
+### Setup
+
+No SQL migration is required.
+
+No new Vercel environment variables are required.
