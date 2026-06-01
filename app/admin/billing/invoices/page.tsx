@@ -44,6 +44,10 @@ interface InvoiceRow {
   payment_recorded_by: string | null;
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
+  stripe_charge_id: string | null;
+  stripe_receipt_url: string | null;
+  stripe_payment_method_type: string | null;
+  stripe_card_last4: string | null;
   stripe_payment_status: string | null;
   stripe_paid_at: string | null;
   stripe_customer_email: string | null;
@@ -412,6 +416,9 @@ function InvoiceDetailModal({ invoiceId, onClose, onUpdated }: { invoiceId: stri
                   <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Payment Status</dt><dd className="mt-1 text-purple-900">{invoice.stripe_payment_status ? invoice.stripe_payment_status.replace(/_/g, " ") : "—"}</dd></div>
                   <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Stripe Paid At</dt><dd className="mt-1 text-purple-900">{formatDateTime(invoice.stripe_paid_at)}</dd></div>
                   <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Payment Intent</dt><dd className="mt-1 break-all text-purple-900">{invoice.stripe_payment_intent_id ?? "—"}</dd></div>
+                  <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Charge</dt><dd className="mt-1 break-all text-purple-900">{invoice.stripe_charge_id ?? "—"}</dd></div>
+                  <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Payment Method</dt><dd className="mt-1 text-purple-900">{invoice.stripe_payment_method_type ? `${invoice.stripe_payment_method_type}${invoice.stripe_card_last4 ? ` ending ${invoice.stripe_card_last4}` : ""}` : "—"}</dd></div>
+                  <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Receipt</dt><dd className="mt-1 break-all text-purple-900">{invoice.stripe_receipt_url ? <a href={invoice.stripe_receipt_url} target="_blank" rel="noopener noreferrer" className="font-semibold underline">Open receipt</a> : "—"}</dd></div>
                   <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Checkout Session</dt><dd className="mt-1 break-all text-purple-900">{invoice.stripe_checkout_session_id ?? "—"}</dd></div>
                   <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Customer Email</dt><dd className="mt-1 break-all text-purple-900">{invoice.stripe_customer_email ?? "—"}</dd></div>
                   <div><dt className="text-xs font-semibold uppercase tracking-wider text-purple-500">Last Stripe Event</dt><dd className="mt-1 text-purple-900">{formatDateTime(invoice.stripe_last_event_at)}</dd></div>

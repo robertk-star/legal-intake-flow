@@ -1162,3 +1162,29 @@ Copy the webhook signing secret into `STRIPE_WEBHOOK_SECRET` in Vercel, then red
 - On successful payment, the Stripe webhook updates the invoice payment fields.
 - The invoice event log records `stripe_checkout_created` and `stripe_payment_succeeded` events.
 - No automatic charges are created. The partner must click Pay Online.
+
+
+## Phase 35 — Stripe Payment UX & Receipt Tracking
+
+Phase 35 improves Stripe payment handling after the initial Pay Online flow.
+
+Adds:
+
+- Optional Stripe Checkout UX controls:
+  - `STRIPE_CHECKOUT_ALLOW_LINK` — defaults to `true`; set to `false` to request card-only Checkout and reduce Stripe Link prompts.
+  - `STRIPE_CHECKOUT_PREFILL_EMAIL` — defaults to `true`; set to `false` to avoid passing the partner user's email to Stripe Checkout.
+- Stripe receipt metadata captured after successful payment:
+  - `stripe_charge_id`
+  - `stripe_receipt_url`
+  - `stripe_payment_method_type`
+  - `stripe_card_last4`
+- Admin invoice detail displays Stripe charge, receipt link, and payment method details.
+- Partner invoice list displays a Receipt link when Stripe returns one.
+
+Required SQL after deploying Phase 35:
+
+```sql
+sql/section24_stripe_payment_ux_receipts.sql
+```
+
+No required new Vercel ENV variables are added. The two Stripe Checkout UX variables are optional.

@@ -374,3 +374,14 @@ Test flow:
 6. Return to `/partner/invoices`.
 7. Confirm invoice status updates to paid or partially paid after webhook processing.
 8. Confirm admin invoice detail shows Stripe payment status, payment intent, and invoice event log entry.
+
+
+## Phase 35 Stripe Payment UX & Receipt Tracking QA
+
+- Run `sql/section24_stripe_payment_ux_receipts.sql` in the LIF Supabase project.
+- Confirm Stripe ENV values are configured for the intended mode.
+- Optional: set `STRIPE_CHECKOUT_ALLOW_LINK=false` in Vercel and redeploy to request card-only Checkout.
+- Pay an invoice through Stripe Checkout.
+- Confirm admin invoice detail shows charge ID, payment method, and receipt link.
+- Confirm partner invoice list shows a Receipt link after payment.
+- Confirm no automatic charges are created; partners still must click Pay Online.

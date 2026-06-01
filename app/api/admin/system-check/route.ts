@@ -168,7 +168,7 @@ const TABLE_PROBES: TableProbe[] = [
     key: "partner_billing_invoices",
     label: "Partner billing invoices",
     table: "partner_billing_invoices",
-    select: "id, partner_account_id, invoice_number, status, invoice_email_sent_at, invoice_email_count, due_date, reminder_sent_at, reminder_count, finalized_at, payment_instructions, payment_method, payment_reference, payment_received_at, stripe_checkout_session_id, stripe_payment_intent_id, stripe_payment_status, stripe_paid_at",
+    select: "id, partner_account_id, invoice_number, status, invoice_email_sent_at, invoice_email_count, due_date, reminder_sent_at, reminder_count, finalized_at, payment_instructions, payment_method, payment_reference, payment_received_at, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, stripe_receipt_url, stripe_payment_method_type, stripe_card_last4, stripe_payment_status, stripe_paid_at",
     required: true,
   },
   {

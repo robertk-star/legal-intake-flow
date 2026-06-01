@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { verifyStripeWebhookSignature } from "@/lib/stripePayments";
+import { retrieveStripePaymentIntentDetails, verifyStripeWebhookSignature } from "@/lib/stripePayments";
 
 export const runtime = "nodejs";
 
@@ -62,6 +62,9 @@ async function markInvoicePaidFromCheckoutSession(event: StripeEvent, session: S
   }
 
   const amountTotal = Number(session.amount_total ?? 0);
+  const paymentDetails = session.payment_intent
+    ? await retrieveStripePaymentIntentDetails(session.payment_intent)
+    : { data: null, error: null };
   const previousPaid = Number(current.amount_paid_cents ?? 0);
   const total = Number(current.total_cents ?? 0);
   const nextPaid = Math.min(total, previousPaid + Math.max(amountTotal, 0));
@@ -82,6 +85,10 @@ async function markInvoicePaidFromCheckoutSession(event: StripeEvent, session: S
       payment_recorded_by: "stripe",
       stripe_checkout_session_id: session.id,
       stripe_payment_intent_id: session.payment_intent ?? null,
+      stripe_charge_id: paymentDetails.data?.chargeId ?? null,
+      stripe_receipt_url: paymentDetails.data?.receiptUrl ?? null,
+      stripe_payment_method_type: paymentDetails.data?.paymentMethodType ?? null,
+      stripe_card_last4: paymentDetails.data?.cardLast4 ?? null,
       stripe_payment_status: session.payment_status ?? "paid",
       stripe_customer_email: session.customer_email ?? null,
       stripe_paid_at: now,
@@ -100,7 +107,7 @@ async function markInvoicePaidFromCheckoutSession(event: StripeEvent, session: S
     previous_status: current.status,
     next_status: nextStatus,
     amount_cents: amountTotal,
-    notes: `Stripe payment succeeded. Session: ${session.id}. Payment intent: ${session.payment_intent ?? "—"}. Event: ${event.id}.`,
+    notes: `Stripe payment succeeded. Session: ${session.id}. Payment intent: ${session.payment_intent ?? "—"}. Charge: ${paymentDetails.data?.chargeId ?? "—"}. Receipt: ${paymentDetails.data?.receiptUrl ?? "—"}. Event: ${event.id}.`,
     created_by: "stripe",
   });
 
