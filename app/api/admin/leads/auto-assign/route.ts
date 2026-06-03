@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     .from("leads")
     .select("id, created_at, state, benefit_type, application_status")
     .is("assigned_partner_account_id", null)
+    .is("deleted_at", null)
     .in("status", ["new", "reviewing", "ready_to_assign"])
     .order("created_at", { ascending: true })
     .limit(limit);

@@ -18,6 +18,7 @@ type LeadRow = {
   partner_viewed_at: string | null;
   assignment_notification_sent_at: string | null;
   assignment_notification_count: number | null;
+  deleted_at: string | null;
 };
 
 type PartnerRow = {
@@ -153,7 +154,7 @@ export async function GET() {
     .select(
       "id, created_at, source, state, benefit_type, status, assigned_partner_account_id, assigned_at, " +
       "partner_response_status, partner_response_updated_at, partner_viewed_at, " +
-      "assignment_notification_sent_at, assignment_notification_count"
+      "assignment_notification_sent_at, assignment_notification_count, deleted_at"
     )
     .limit(5000);
 
@@ -196,7 +197,7 @@ export async function GET() {
   );
   if (notificationsResult.warning) warnings.push(notificationsResult.warning);
 
-  const leads = (leadsResult.data ?? []) as unknown as LeadRow[];
+  const leads = ((leadsResult.data ?? []) as unknown as LeadRow[]).filter((lead) => !lead.deleted_at);
   const partners = (partnersResult.data ?? []) as unknown as PartnerRow[];
   const partnerUsers = usersResult.rows;
   const assignmentEvents = assignmentsResult.rows;

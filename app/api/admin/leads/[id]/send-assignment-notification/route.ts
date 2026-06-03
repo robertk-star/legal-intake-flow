@@ -24,6 +24,7 @@ export async function POST(
     .from("leads")
     .select("id, assigned_partner_account_id")
     .eq("id", id)
+    .is("deleted_at", null)
     .single();
 
   if (error || !lead) {

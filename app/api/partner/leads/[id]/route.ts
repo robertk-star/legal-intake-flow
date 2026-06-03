@@ -48,6 +48,7 @@ export async function GET(
     .select(DETAIL_SELECT)
     .eq("id", id)
     .eq("assigned_partner_account_id", session.partnerAccountId)
+    .is("deleted_at", null)
     .single();
 
   if (error || !data) {
@@ -64,6 +65,7 @@ export async function GET(
       .update({ partner_viewed_at: viewedAt })
       .eq("id", id)
       .eq("assigned_partner_account_id", session.partnerAccountId)
+      .is("deleted_at", null)
       .select(DETAIL_SELECT)
       .single();
 
@@ -141,6 +143,7 @@ export async function PATCH(
     .update(updates)
     .eq("id", id)
     .eq("assigned_partner_account_id", session.partnerAccountId)
+    .is("deleted_at", null)
     .select(DETAIL_SELECT)
     .single();
 

@@ -138,12 +138,14 @@ export default async function PartnerDashboardPage() {
         .from("leads")
         .select("id", { count: "exact", head: true })
         .eq("assigned_partner_account_id", session.partnerAccountId)
+        .is("deleted_at", null)
     ),
     getCount(
       supabaseAdmin
         .from("leads")
         .select("id", { count: "exact", head: true })
         .eq("assigned_partner_account_id", session.partnerAccountId)
+        .is("deleted_at", null)
         .or("partner_response_status.is.null,partner_response_status.eq.new")
     ),
     getCount(

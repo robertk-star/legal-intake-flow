@@ -465,3 +465,16 @@ Expected:
 - no duplicate record on repeat sends
 - admin lead detail shows DBS report number and consent details
 - auto-assignment remains controlled only by existing routing settings
+
+## Phase 39 — Lead Deletion + DBS Duplicate Reset QA
+
+1. Run `sql/section26_lead_deletion_reset.sql` in the LIF Supabase project.
+2. Send a test DBS lead through `/api/intake/ingest` with `external_reference_id = dbs:<test-id>`.
+3. Confirm the lead appears in `/admin/leads`.
+4. Open the lead and click **Delete Lead & Allow DBS Resend**.
+5. Confirm the lead disappears from the normal admin lead queue.
+6. Send the same DBS payload again with the same `external_reference_id`.
+7. Confirm LIF creates a new lead instead of returning `duplicate: true`.
+8. Confirm the new lead appears in `/admin/leads`.
+9. Confirm partner lead queues do not show the deleted lead.
+10. Confirm `/admin/system-check` passes the lead deletion/reset table checks.

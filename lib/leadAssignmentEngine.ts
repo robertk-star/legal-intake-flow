@@ -142,6 +142,7 @@ export async function assignBestMatchToLead(input: {
     .from("leads")
     .select("id, status, assigned_partner_account_id")
     .eq("id", input.leadId)
+    .is("deleted_at", null)
     .single();
 
   if (currentLeadError || !currentLead) {
@@ -174,6 +175,7 @@ export async function assignBestMatchToLead(input: {
     .from("leads")
     .update(updates)
     .eq("id", input.leadId)
+    .is("deleted_at", null)
     .select(
       "id, status, assigned_partner_account_id, assigned_at, partner_response_status, " +
       "partner_response_updated_at, partner_viewed_at, partner_notes, updated_at"

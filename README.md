@@ -1320,3 +1320,42 @@ No new Vercel environment variable is required. This phase continues to use the 
 ```text
 LIF_DBS_INGEST_SECRET
 ```
+
+## Phase 39 — Lead Deletion + DBS Duplicate Reset
+
+Phase 39 adds an admin-only delete/reset workflow for LIF leads.
+
+### Purpose
+
+Sometimes an ingested DBS lead may be a test lead, mistaken handoff, or otherwise needs to be removed from active LIF workflows. Because LIF uses `source + external_reference_id` for duplicate protection, simply hiding a lead is not enough: the original DBS external reference must also be moved aside so DBS can send the same stable reference again later.
+
+### New migration
+
+Run this SQL before testing Phase 39:
+
+```text
+sql/section26_lead_deletion_reset.sql
+```
+
+### Behavior
+
+- Admin can open `/admin/leads`, view a lead, and use **Delete Lead & Allow DBS Resend**.
+- The lead is soft-deleted by setting `deleted_at` and related audit fields.
+- The original `external_reference_id` is moved to `original_external_reference_id`.
+- The active `external_reference_id` is changed to a deleted/reset value.
+- Assignment and partner response fields are cleared.
+- Normal admin and partner lead queues exclude deleted leads.
+- DBS can resend the same `external_reference_id` later without the duplicate filter blocking it.
+- A `lead_deletion_events` audit row is written when possible.
+
+### What this does not do
+
+- It does not delete partner accounts.
+- It does not change billing or invoice history.
+- It does not change DBS.
+- It does not create a new ingest endpoint.
+- It does not disable duplicate protection for active leads.
+
+### Setup
+
+No new Vercel environment variable is required.

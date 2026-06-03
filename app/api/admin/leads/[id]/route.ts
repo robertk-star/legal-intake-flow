@@ -32,6 +32,7 @@ export async function GET(
     .from("leads")
     .select("*")
     .eq("id", id)
+    .is("deleted_at", null)
     .single();
 
   if (error || !data) {
@@ -105,6 +106,7 @@ export async function PATCH(
       .from("leads")
       .select("id, assigned_partner_account_id")
       .eq("id", id)
+      .is("deleted_at", null)
       .single();
 
     if (currentLeadError || !currentLead) {
@@ -176,6 +178,7 @@ export async function PATCH(
     .from("leads")
     .update(updates)
     .eq("id", id)
+    .is("deleted_at", null)
     .select(
       "id, status, internal_review_notes, assigned_partner_account_id, assigned_at, " +
       "partner_response_status, partner_response_updated_at, partner_viewed_at, partner_notes, updated_at"
@@ -215,4 +218,116 @@ export async function PATCH(
   }
 
   return NextResponse.json({ success: true, data, notifications: notificationSummary });
+}
+
+/**
+ * DELETE /api/admin/leads/[id]
+ *
+ * Soft-deletes a lead from active LIF workflows and resets the DBS duplicate key
+ * by moving the current external_reference_id into original_external_reference_id.
+ * This allows DBS to send the same stable external reference again later without
+ * being blocked by LIF duplicate detection.
+ */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!(await isAdminAuthenticated())) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  let body: unknown = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+
+  if (!isPlainObject(body)) {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const deletionReason = String(body.deletion_reason ?? "").trim() || "Admin deleted lead and reset duplicate key.";
+
+  const { data: lead, error: leadError } = await supabaseAdmin
+    .from("leads")
+    .select("id, source, external_reference_id, dbs_report_number, deleted_at")
+    .eq("id", id)
+    .single();
+
+  if (leadError || !lead) {
+    return NextResponse.json({ error: "Lead not found." }, { status: 404 });
+  }
+
+  const currentLead = lead as {
+    id: string;
+    source: string | null;
+    external_reference_id: string | null;
+    dbs_report_number: string | null;
+    deleted_at: string | null;
+  };
+
+  if (currentLead.deleted_at) {
+    return NextResponse.json({ error: "Lead is already deleted." }, { status: 409 });
+  }
+
+  const deletedAt = new Date().toISOString();
+  const originalExternalReferenceId = currentLead.external_reference_id;
+  const resetExternalReferenceId = originalExternalReferenceId
+    ? `deleted:${id}:${Date.now()}`
+    : null;
+
+  const { data: deletedLead, error: deleteError } = await supabaseAdmin
+    .from("leads")
+    .update({
+      deleted_at: deletedAt,
+      deleted_by: "admin",
+      deletion_reason: deletionReason,
+      original_external_reference_id: originalExternalReferenceId,
+      original_dbs_report_number: currentLead.dbs_report_number,
+      external_reference_id: resetExternalReferenceId,
+      dbs_report_number: null,
+      assigned_partner_account_id: null,
+      assigned_at: null,
+      partner_response_status: null,
+      partner_response_updated_at: null,
+      partner_viewed_at: null,
+      partner_notes: null,
+      status: "closed",
+    })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("id, deleted_at, original_external_reference_id, external_reference_id")
+    .single();
+
+  if (deleteError || !deletedLead) {
+    console.error("[DELETE /api/admin/leads/[id]] Delete/reset error:", deleteError);
+    return NextResponse.json({ error: "Failed to delete lead and reset duplicate key." }, { status: 500 });
+  }
+
+  const { error: eventError } = await supabaseAdmin
+    .from("lead_deletion_events")
+    .insert({
+      lead_id: id,
+      deleted_by: "admin",
+      deletion_reason: deletionReason,
+      original_source: currentLead.source,
+      original_external_reference_id: originalExternalReferenceId,
+      reset_external_reference_id: resetExternalReferenceId,
+      original_dbs_report_number: currentLead.dbs_report_number,
+    });
+
+  if (eventError) {
+    console.error("[DELETE /api/admin/leads/[id]] Delete audit insert error:", eventError);
+  }
+
+  return NextResponse.json({
+    success: true,
+    deleted: true,
+    leadId: id,
+    originalExternalReferenceId,
+    resetExternalReferenceId,
+  });
 }

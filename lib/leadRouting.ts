@@ -217,6 +217,7 @@ export async function getPartnerEligibilityForLeadId(leadId: string) {
     .from("leads")
     .select("id, state, benefit_type, application_status")
     .eq("id", leadId)
+    .is("deleted_at", null)
     .single();
 
   if (leadError || !lead) {
@@ -245,6 +246,7 @@ export async function getPartnerEligibilityForLeadId(leadId: string) {
     .from("leads")
     .select("assigned_partner_account_id")
     .not("assigned_partner_account_id", "is", null)
+    .is("deleted_at", null)
     .gte("assigned_at", monthStart.toISOString())
     .in("status", ["assigned", "reviewing", "ready_to_assign", "new"]);
 

@@ -45,6 +45,7 @@ export async function GET(request: Request) {
       "partner_response_updated_at, partner_viewed_at"
     )
     .eq("assigned_partner_account_id", session.partnerAccountId)
+    .is("deleted_at", null)
     .order("assigned_at", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(limit);

@@ -36,6 +36,7 @@ export async function GET(request: Request) {
       "benefit_type, application_status, status, " +
       "assigned_partner_account_id, assigned_at, partner_response_status, partner_response_updated_at"
     )
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
 

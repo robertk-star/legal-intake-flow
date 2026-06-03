@@ -13,6 +13,7 @@ type LeadRow = {
   partner_response_status: string | null;
   partner_viewed_at: string | null;
   billable_status: string | null;
+  deleted_at: string | null;
 };
 
 type PartnerRow = {
@@ -150,7 +151,7 @@ export async function GET() {
   ] = await Promise.all([
     safeSelect<LeadRow>(
       "leads",
-      "id, created_at, status, state, benefit_type, assigned_partner_account_id, assigned_at, partner_response_status, partner_viewed_at, billable_status",
+      "id, created_at, status, state, benefit_type, assigned_partner_account_id, assigned_at, partner_response_status, partner_viewed_at, billable_status, deleted_at",
       { orderColumn: "created_at", limit: 1000 }
     ),
     safeSelect<PartnerRow>(
@@ -195,7 +196,7 @@ export async function GET() {
     assignmentsResult.warning,
   ].filter(Boolean) as string[];
 
-  const leads = leadsResult.rows;
+  const leads = leadsResult.rows.filter((lead) => !lead.deleted_at);
   const partners = partnersResult.rows;
   const requests = requestsResult.rows;
   const invoices = invoicesResult.rows;

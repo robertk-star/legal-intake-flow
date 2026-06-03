@@ -153,11 +153,13 @@ function LeadDetailModal({
   partners,
   onClose,
   onUpdated,
+  onDeleted,
 }: {
   leadId: string;
   partners: PartnerAccount[];
   onClose: () => void;
   onUpdated: (updated: Partial<LeadDetail> & { id: string }) => void;
+  onDeleted: (id: string) => void;
 }) {
   const [lead, setLead]                   = useState<LeadDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
@@ -181,6 +183,8 @@ function LeadDetailModal({
   const [sendingNotification, setSendingNotification] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [notificationSuccess, setNotificationSuccess] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Fetch full lead detail on mount
   useEffect(() => {
@@ -340,6 +344,42 @@ function LeadDetailModal({
       setNotificationError("Network error. Please try again.");
     } finally {
       setSendingNotification(false);
+    }
+  }
+
+  async function handleDeleteLead() {
+    if (!lead) return;
+
+    const confirmed = window.confirm(
+      "Delete this lead from active LIF workflows?\n\nThis will also reset the DBS duplicate key so DBS can send this same lead again later. This action hides the lead from the normal admin and partner queues."
+    );
+    if (!confirmed) return;
+
+    const reason = window.prompt(
+      "Optional deletion reason:",
+      "Deleted by admin; allow DBS resend."
+    );
+
+    setDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const res = await fetch(`/api/admin/leads/${lead.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deletion_reason: reason || "Deleted by admin; allow DBS resend." }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteError(data.error ?? "Failed to delete lead.");
+        return;
+      }
+      onDeleted(lead.id);
+      onClose();
+    } catch {
+      setDeleteError("Network error. Please try again.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -656,6 +696,25 @@ function LeadDetailModal({
                 )}
               </section>
 
+              {/* Delete / reset duplicate key */}
+              <section className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-red-700">Delete Lead / Reset DBS Duplicate Key</h3>
+                <p className="text-sm text-red-800">
+                  Use this for test leads or mistaken handoffs. The lead will be hidden from normal LIF queues and its
+                  original DBS external reference will be moved aside so DBS can send the same lead again without being
+                  blocked as a duplicate.
+                </p>
+                {deleteError && <p className="text-xs text-red-700">{deleteError}</p>}
+                <button
+                  type="button"
+                  onClick={handleDeleteLead}
+                  disabled={deleting}
+                  className="rounded-lg border border-red-600 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deleting ? "Deleting…" : "Delete Lead & Allow DBS Resend"}
+                </button>
+              </section>
+
               {/* Admin Actions */}
               <section className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Admin Actions</h3>
@@ -790,6 +849,11 @@ export default function AdminLeadsPage() {
     setLeads((prev) =>
       prev.map((l) => (l.id === updated.id ? { ...l, ...updated } : l))
     );
+  }
+
+  function handleDeleted(id: string) {
+    setLeads((prev) => prev.filter((lead) => lead.id !== id));
+    setSelectedLeadId(null);
   }
 
   return (
@@ -986,6 +1050,7 @@ export default function AdminLeadsPage() {
           partners={partners}
           onClose={() => setSelectedLeadId(null)}
           onUpdated={handleUpdated}
+          onDeleted={handleDeleted}
         />
       )}
     </div>
