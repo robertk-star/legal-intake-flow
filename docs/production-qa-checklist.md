@@ -410,3 +410,58 @@ No new Vercel environment variable is required.
 - Confirm the homepage links to the example reports page.
 - Confirm `/for-attorneys` links to the example reports page.
 - Confirm no unredacted personal information is visible in the sample PDFs.
+
+---
+
+## Phase 38 — DBS Ingest Receipt Hardening QA
+
+### Setup
+
+Run this SQL in the LIF Supabase project before testing:
+
+```text
+sql/section25_dbs_ingest_receipt_hardening.sql
+```
+
+No new Vercel environment variable is required.
+
+### Test: consent required
+
+Send a DBS ingest request without `consent_given: true`.
+
+Expected:
+
+```text
+HTTP 400 Missing required consent confirmation.
+```
+
+### Test: stable DBS external reference required
+
+Send a DBS ingest request with a missing or non-DBS external reference, such as `DBR-000001`.
+
+Expected:
+
+```text
+HTTP 400 Missing required stable DBS external reference.
+```
+
+### Test: successful DBS ingest
+
+Send a consented request with:
+
+```json
+{
+  "external_reference_id": "dbs:<lead-uuid>",
+  "dbs_report_number": "DBR-000001",
+  "consent_given": true,
+  "consent_source": "disabilitybenefitsscreening",
+  "consent_timestamp": "2026-06-01T12:00:00Z"
+}
+```
+
+Expected:
+
+- lead created or duplicate returned
+- no duplicate record on repeat sends
+- admin lead detail shows DBS report number and consent details
+- auto-assignment remains controlled only by existing routing settings

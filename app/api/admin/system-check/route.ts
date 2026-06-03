@@ -134,7 +134,7 @@ const TABLE_PROBES: TableProbe[] = [
     label: "DBS leads + partner workflow fields",
     table: "leads",
     select:
-      "id, source, external_reference_id, status, assigned_partner_account_id, assigned_at, " +
+      "id, source, external_reference_id, dbs_report_number, dbs_consent_given, dbs_consent_source, dbs_consent_timestamp, dbs_received_at, consent_given, status, assigned_partner_account_id, assigned_at, " +
       "partner_response_status, partner_notes, partner_viewed_at, partner_response_updated_at, " +
       "assignment_notification_sent_at, assignment_notification_count, " +
       "billable_status, billing_amount_cents, billing_notes",

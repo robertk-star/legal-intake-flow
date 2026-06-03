@@ -21,6 +21,9 @@ interface LeadRow {
   updated_at: string;
   source: string;
   external_reference_id: string | null;
+  dbs_report_number: string | null;
+  dbs_consent_given: boolean | null;
+  dbs_received_at: string | null;
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
@@ -40,6 +43,9 @@ interface LeadDetail extends LeadRow {
   medical_summary: string | null;
   additional_notes: string | null;
   internal_review_notes: string | null;
+  consent_given: boolean | null;
+  dbs_consent_source: string | null;
+  dbs_consent_timestamp: string | null;
   partner_response_status: string | null;
   partner_notes: string | null;
   partner_viewed_at: string | null;
@@ -397,8 +403,13 @@ function LeadDetailModal({
               <section>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Source Information</h3>
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                  <DetailField label="Source" value={lead.source} />
+                  <DetailField label="Source" value={lead.source === "disabilitybenefitsscreening" ? "DBS" : lead.source} />
+                  <DetailField label="DBS Report Number" value={lead.dbs_report_number} />
                   <DetailField label="External Reference ID" value={lead.external_reference_id} />
+                  <DetailField label="Received At" value={formatDateTime(lead.dbs_received_at)} />
+                  <DetailField label="Consent" value={(lead.dbs_consent_given ?? lead.consent_given) ? "Yes" : "No"} />
+                  <DetailField label="Consent Source" value={lead.dbs_consent_source} />
+                  <DetailField label="Consent Timestamp" value={formatDateTime(lead.dbs_consent_timestamp)} />
                 </dl>
               </section>
 
@@ -889,6 +900,7 @@ export default function AdminLeadsPage() {
                   <tr>
                     <th className="px-4 py-3 text-left">Received</th>
                     <th className="px-4 py-3 text-left">Source</th>
+                    <th className="px-4 py-3 text-left">DBS Report</th>
                     <th className="px-4 py-3 text-left">Ext. Ref</th>
                     <th className="px-4 py-3 text-left">Name</th>
                     <th className="px-4 py-3 text-left">State</th>
@@ -915,6 +927,9 @@ export default function AdminLeadsPage() {
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
                           {lead.source}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                          {lead.dbs_report_number ?? <span className="italic text-gray-400">—</span>}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500 font-mono whitespace-nowrap">
                           {lead.external_reference_id ?? <span className="italic text-gray-400">—</span>}

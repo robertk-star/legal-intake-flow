@@ -1260,3 +1260,63 @@ The public header/footer now include **Example Reports**. The homepage and For A
 No SQL migration is required.
 
 No new Vercel environment variables are required.
+
+## Phase 38 — DBS Ingest Receipt Hardening
+
+Phase 38 hardens the existing DBS → LIF handoff receiver without creating a second ingest endpoint.
+
+### Existing route kept
+
+- `POST /api/intake/ingest` — still the only DBS lead ingestion endpoint.
+
+### New DBS receipt requirements
+
+DBS handoffs are now rejected unless:
+
+```text
+consent_given=true
+external_reference_id=dbs:<DBS lead UUID>
+```
+
+`dbs_report_number` is stored separately for display/search only and is not used as the duplicate key.
+
+### New stored receipt fields
+
+Run this migration before testing:
+
+```text
+sql/section25_dbs_ingest_receipt_hardening.sql
+```
+
+It adds:
+
+- `dbs_report_number`
+- `dbs_consent_given`
+- `dbs_consent_source`
+- `dbs_consent_timestamp`
+- `dbs_received_at`
+- `consent_given` if missing on fresh installs
+
+### Duplicate behavior
+
+If DBS sends the same `source + external_reference_id` again, LIF does not create a duplicate. It returns the existing LIF lead ID and updates DBS receipt metadata such as `dbs_received_at`, `raw_payload`, report number, and consent details while preserving the original `created_at`.
+
+### Admin visibility
+
+The admin lead detail view shows:
+
+- Source
+- DBS report number
+- External reference ID
+- Consent status
+- Consent source
+- Consent timestamp
+- DBS received timestamp
+
+### Environment variables
+
+No new Vercel environment variable is required. This phase continues to use the existing:
+
+```text
+LIF_DBS_INGEST_SECRET
+```

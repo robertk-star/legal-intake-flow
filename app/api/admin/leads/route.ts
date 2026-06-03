@@ -31,8 +31,8 @@ export async function GET(request: Request) {
   let query = supabaseAdmin
     .from("leads")
     .select(
-      "id, created_at, updated_at, source, external_reference_id, " +
-      "first_name, last_name, phone, email, city, state, zip, " +
+      "id, created_at, updated_at, source, external_reference_id, dbs_report_number, " +
+      "dbs_consent_given, dbs_received_at, first_name, last_name, phone, email, city, state, zip, " +
       "benefit_type, application_status, status, " +
       "assigned_partner_account_id, assigned_at, partner_response_status, partner_response_updated_at"
     )
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
     query = query.or(
       `first_name.ilike.%${search}%,last_name.ilike.%${search}%,` +
       `email.ilike.%${search}%,phone.ilike.%${search}%,` +
-      `external_reference_id.ilike.%${search}%`
+      `external_reference_id.ilike.%${search}%,dbs_report_number.ilike.%${search}%`
     );
   }
 
