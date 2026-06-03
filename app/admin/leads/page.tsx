@@ -36,6 +36,14 @@ interface LeadRow {
   status: LeadStatus;
   assigned_partner_account_id: string | null;
   assigned_at: string | null;
+  latest_ingest_result: string | null;
+  latest_ingest_is_dry_run: boolean | null;
+  latest_ingest_dry_run_result: string | null;
+  latest_ingest_duplicate: boolean | null;
+  latest_ingest_at: string | null;
+  latest_ingest_error: string | null;
+  latest_assignment_type: string | null;
+  latest_assignment_event_at: string | null;
 }
 
 /** Full record returned by the detail endpoint */
@@ -133,6 +141,52 @@ function Badge({ label, colorClass }: { label: string; colorClass: string }) {
       {label.replace(/_/g, " ")}
     </span>
   );
+}
+
+function sourceLabel(source: string | null | undefined) {
+  if (source === "disabilitybenefitsscreening") return "DBS";
+  return source || "—";
+}
+
+function IngestBadge({ lead }: { lead: LeadRow }) {
+  const result = lead.latest_ingest_result;
+  if (!result) {
+    return <span className="italic text-gray-400">No event</span>;
+  }
+  const label = lead.latest_ingest_is_dry_run
+    ? `Dry Run: ${(lead.latest_ingest_dry_run_result ?? result).replace(/_/g, " ")}`
+    : result.replace(/_/g, " ");
+  const color = result === "created"
+    ? "bg-green-100 text-green-800"
+    : result === "duplicate"
+    ? "bg-blue-100 text-blue-800"
+    : result === "rejected" || result === "failed"
+    ? "bg-red-100 text-red-800"
+    : result === "dry_run"
+    ? "bg-purple-100 text-purple-800"
+    : "bg-gray-100 text-gray-700";
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${color}`}>
+      {label}
+    </span>
+  );
+}
+
+function AssignmentBadge({ lead }: { lead: LeadRow }) {
+  if (!lead.assigned_partner_account_id) {
+    return <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700">Unassigned</span>;
+  }
+  const type = lead.latest_assignment_type;
+  if (type === "auto_ingest" || type === "auto_batch") {
+    return <span className="inline-flex rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-800">Auto-assigned</span>;
+  }
+  if (type === "best_match") {
+    return <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">Best Match</span>;
+  }
+  if (type === "reassignment") {
+    return <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Reassigned</span>;
+  }
+  return <span className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">Assigned</span>;
 }
 
 function DetailField({ label, value }: { label: string; value: string | null | undefined }) {
@@ -811,6 +865,8 @@ export default function AdminLeadsPage() {
   const [benefitFilter, setBenefitFilter]   = useState("");
   const [statusFilter, setStatusFilter]     = useState("");
   const [assignedFilter, setAssignedFilter] = useState("");
+  const [sourceFilter, setSourceFilter]     = useState("dbs");
+  const [ingestFilter, setIngestFilter]     = useState("");
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
@@ -821,6 +877,8 @@ export default function AdminLeadsPage() {
     if (benefitFilter)  params.set("benefit_type", benefitFilter);
     if (statusFilter)   params.set("status", statusFilter);
     if (assignedFilter) params.set("assigned", assignedFilter);
+    if (sourceFilter)   params.set("source", sourceFilter);
+    if (ingestFilter)   params.set("latest_ingest_result", ingestFilter);
 
     try {
       const res = await fetch(`/api/admin/leads?${params.toString()}`);
@@ -833,7 +891,7 @@ export default function AdminLeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, stateFilter, benefitFilter, statusFilter, assignedFilter, router]);
+  }, [search, stateFilter, benefitFilter, statusFilter, assignedFilter, sourceFilter, ingestFilter, router]);
 
   useEffect(() => { fetchLeads(); }, [fetchLeads]);
 
@@ -867,6 +925,7 @@ export default function AdminLeadsPage() {
             <a href="/admin/partner-requests" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partner Requests</a>
             <a href="/admin/partners" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Partner Accounts</a>
             <a href="/admin/leads" className="text-sm font-semibold text-[#1a3a5c]">Lead Queue</a>
+            <a href="/admin/dbs-diagnostics" className="text-sm text-gray-500 hover:text-[#0d1b2e]">DBS Diagnostics</a>
             <a href="/admin/routing" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Routing</a>
             <a href="/admin/notifications" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Notifications</a>
             <a href="/admin/reports" className="text-sm text-gray-500 hover:text-[#0d1b2e]">Reports</a>
@@ -893,7 +952,7 @@ export default function AdminLeadsPage() {
 
         {/* Filters */}
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
             <input
               type="text"
               placeholder="Search name, email, phone, ref ID…"
@@ -934,11 +993,33 @@ export default function AdminLeadsPage() {
               onChange={(e) => setAssignedFilter(e.target.value)}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
             >
-              <option value="">All Leads</option>
+              <option value="">All Assignments</option>
               <option value="false">Unassigned</option>
               <option value="true">Assigned</option>
             </select>
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+            >
+              <option value="dbs">DBS Only</option>
+              <option value="all">All Sources</option>
+              <option value="other">Non-DBS</option>
+            </select>
+            <select
+              value={ingestFilter}
+              onChange={(e) => setIngestFilter(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#1a3a5c]"
+            >
+              <option value="">All Ingest Results</option>
+              <option value="created">Created</option>
+              <option value="duplicate">Duplicate</option>
+              <option value="dry_run">Dry Run</option>
+              <option value="rejected">Rejected</option>
+              <option value="failed">Failed</option>
+            </select>
           </div>
+          <p className="mt-3 text-xs text-gray-500">DBS-only is selected by default. Click a DBS external reference to open the diagnostics view filtered to that lead.</p>
         </div>
 
         {/* Table */}
@@ -966,11 +1047,14 @@ export default function AdminLeadsPage() {
                     <th className="px-4 py-3 text-left">Source</th>
                     <th className="px-4 py-3 text-left">DBS Report</th>
                     <th className="px-4 py-3 text-left">Ext. Ref</th>
+                    <th className="px-4 py-3 text-left">Consent</th>
+                    <th className="px-4 py-3 text-left">Latest Ingest</th>
                     <th className="px-4 py-3 text-left">Name</th>
                     <th className="px-4 py-3 text-left">State</th>
                     <th className="px-4 py-3 text-left">Benefit Type</th>
                     <th className="px-4 py-3 text-left">App. Status</th>
                     <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-left">Assignment</th>
                     <th className="px-4 py-3 text-left">Assigned Partner</th>
                     <th className="px-4 py-3 text-left">Actions</th>
                   </tr>
@@ -990,13 +1074,35 @@ export default function AdminLeadsPage() {
                           {formatDate(lead.created_at)}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-                          {lead.source}
+                          {sourceLabel(lead.source)}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
                           {lead.dbs_report_number ?? <span className="italic text-gray-400">—</span>}
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-500 font-mono whitespace-nowrap">
-                          {lead.external_reference_id ?? <span className="italic text-gray-400">—</span>}
+                          {lead.external_reference_id ? (
+                            <a
+                              href={`/admin/dbs-diagnostics?search=${encodeURIComponent(lead.external_reference_id)}`}
+                              className="text-blue-700 underline underline-offset-2 hover:text-blue-900"
+                            >
+                              {lead.external_reference_id}
+                            </a>
+                          ) : (
+                            <span className="italic text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {(lead.dbs_consent_given === true) ? (
+                            <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 font-semibold text-green-800">Yes</span>
+                          ) : (
+                            <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-700">No</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <div className="space-y-1">
+                            <IngestBadge lead={lead} />
+                            {lead.latest_ingest_at && <div className="text-[11px] text-gray-400">{formatDate(lead.latest_ingest_at)}</div>}
+                          </div>
                         </td>
                         <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
                           {displayName ?? <span className="italic text-gray-400">—</span>}
@@ -1015,6 +1121,9 @@ export default function AdminLeadsPage() {
                             label={LEAD_STATUS_LABELS[lead.status] ?? lead.status}
                             colorClass={LEAD_STATUS_COLORS[lead.status] ?? "bg-gray-100 text-gray-700"}
                           />
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <AssignmentBadge lead={lead} />
                         </td>
                         <td className="px-4 py-3 text-xs text-gray-600">
                           {assignedPartner

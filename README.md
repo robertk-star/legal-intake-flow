@@ -1493,3 +1493,31 @@ sql/section28_dbs_ingest_test_controls.sql
 ```
 
 No new Vercel environment variables are required.
+
+## Phase 53 — DBS Intake Operations Polish
+
+Phase 53 improves LIF-side visibility for DBS-ingested leads without changing the ingest endpoint, partner routing, billing, or assignment behavior.
+
+### Updated routes
+
+- `GET /api/admin/leads` now supports DBS operations filters and enriches lead rows with the latest DBS ingest event and latest assignment event when available.
+- `/admin/leads` now defaults to a DBS-only operations view, includes a DBS-only/all/non-DBS source filter, an ingest-result filter, consent badges, latest ingest result badges, assignment method badges, and direct links from `dbs:<lead-id>` references to `/admin/dbs-diagnostics`.
+
+### New lead queue filters
+
+- Source: DBS Only / All Sources / Non-DBS
+- Latest Ingest Result: Created / Duplicate / Dry Run / Rejected / Failed
+- Existing lead filters remain unchanged.
+
+### Behavior
+
+- No new DBS ingest endpoint was added.
+- No automatic routing behavior was changed.
+- No partner account, billing, Stripe, or public intake behavior was changed.
+- The feature uses existing `dbs_ingest_events` and `lead_assignment_events` tables from prior phases.
+
+### Setup
+
+No SQL migration is required for Phase 53.
+
+No new Vercel environment variable is required.

@@ -517,3 +517,14 @@ sql/section27_dbs_lif_diagnostics.sql
 8. Open `/admin/dbs-diagnostics`.
 9. Confirm dry-run events show with safe payload summary.
 10. Use **Clear Dry-Run Events** and confirm only dry-run diagnostics are cleared; leads remain unchanged.
+
+## Phase 53 — DBS Intake Operations Polish QA
+
+1. Log in as admin.
+2. Open `/admin/leads`.
+3. Confirm the lead queue defaults to `DBS Only`.
+4. Confirm source, DBS report number, external reference, consent, latest ingest result, assignment method, and assigned partner columns display.
+5. Use the source filter to switch between DBS-only, all sources, and non-DBS.
+6. Use the latest ingest result filter for created, duplicate, dry-run, rejected, and failed events.
+7. Click a `dbs:<lead-id>` external reference and confirm `/admin/dbs-diagnostics` opens filtered to that DBS reference.
+8. Confirm no assignment behavior changed; assignment remains manual/admin-triggered.
