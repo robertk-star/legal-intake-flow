@@ -541,3 +541,18 @@ sql/section27_dbs_lif_diagnostics.sql
 6. Confirm a DBS lead without consent cannot be manually assigned to a partner.
 7. Confirm Assign Best Match is disabled or blocked for a DBS lead without consent.
 8. Confirm non-DBS leads are not affected by this guard.
+
+## Phase 55 — Production Ingest Readiness Panel QA
+
+No SQL migration is required.
+
+No new Vercel environment variable is required.
+
+1. Log in as admin.
+2. Open `/admin/dbs-diagnostics`.
+3. Confirm the top readiness banner appears.
+4. Confirm no secret values are displayed.
+5. Confirm the checklist shows the ingest secret, diagnostics table, receipt fields, successful ingest, duplicate test, no-consent rejection test, auto-assignment mode, and consent preservation checks.
+6. Confirm the banner says **Ready for DBS production ingest** only when required checks are complete.
+7. Confirm dry-run, duplicate, and rejected/no-consent events still appear in the existing diagnostics tables.
+8. Confirm partner accounts, billing, Stripe, routing, and public pages are unchanged.

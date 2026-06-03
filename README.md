@@ -1541,3 +1541,40 @@ No new SQL migration is required.
 No new Vercel environment variable is required.
 
 This phase uses the existing DBS receipt fields from `sql/section25_dbs_ingest_receipt_hardening.sql`.
+
+## Phase 55 — Production Ingest Readiness Panel
+
+Phase 55 adds a production readiness summary to the existing LIF DBS diagnostics page. It does not create a new ingest endpoint and does not change partner, billing, routing, Stripe, or public site workflows.
+
+### Updated routes
+
+- `/admin/dbs-diagnostics` now includes a top readiness banner showing whether LIF is ready for DBS production ingest or needs attention.
+- `GET /api/admin/dbs-diagnostics` now returns a `readiness` object with a checklist and status summary.
+
+### Readiness checks
+
+The panel checks:
+
+- `LIF_DBS_INGEST_SECRET` is configured.
+- DBS ingest diagnostics table is available.
+- DBS receipt fields are available on `leads`.
+- A recent successful created ingest exists.
+- A recent duplicate or would-duplicate test exists.
+- A recent no-consent rejection or would-reject test exists.
+- Auto-assignment mode is visible.
+- Recent active DBS leads preserve consent details.
+
+### Behavior
+
+- No new DBS ingest endpoint was added.
+- No automatic assignment behavior was changed.
+- No partner account, partner dashboard, billing, Stripe, or public intake behavior was changed.
+- Secret values are never shown.
+
+### SQL / ENV
+
+No new SQL migration is required for Phase 55.
+
+No new Vercel environment variable is required.
+
+This phase uses the existing diagnostics and receipt tables/columns from earlier DBS ingest phases.

@@ -44,9 +44,25 @@ type DbsLead = {
   partner_response_status: string | null;
 };
 
+type ReadinessItem = {
+  key: string;
+  label: string;
+  status: "ok" | "needs_review" | "action_required";
+  detail: string;
+};
+
 type DiagnosticsData = {
   generatedAt: string;
   warnings: string[];
+  readiness: {
+    status: "ready" | "needs_review" | "not_ready";
+    label: string;
+    message: string;
+    actionRequiredCount: number;
+    needsReviewCount: number;
+    autoAssignmentMode: "manual_review" | "auto_assignment_enabled";
+    checklist: ReadinessItem[];
+  };
   configuration: {
     endpoint: string;
     lifDbsIngestSecretConfigured: boolean;
@@ -111,6 +127,55 @@ function ResultPill({ result }: { result: string }) {
     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${RESULT_STYLES[result] ?? "bg-gray-100 text-gray-700"}`}>
       {result.replace(/_/g, " ")}
     </span>
+  );
+}
+
+function ReadinessPill({ status }: { status: ReadinessItem["status"] }) {
+  const label = status === "ok" ? "OK" : status === "needs_review" ? "Needs Review" : "Action Required";
+  const colors = status === "ok"
+    ? "bg-green-100 text-green-800"
+    : status === "needs_review"
+      ? "bg-yellow-100 text-yellow-800"
+      : "bg-red-100 text-red-700";
+  return <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${colors}`}>{label}</span>;
+}
+
+function ReadinessBanner({ readiness }: { readiness: DiagnosticsData["readiness"] }) {
+  const isReady = readiness.status === "ready";
+  const isReview = readiness.status === "needs_review";
+  const colors = isReady
+    ? "border-green-200 bg-green-50 text-green-900"
+    : isReview
+      ? "border-yellow-200 bg-yellow-50 text-yellow-900"
+      : "border-red-200 bg-red-50 text-red-900";
+  const badge = isReady ? "Ready" : isReview ? "Needs Review" : "Not Ready";
+  return (
+    <section className={`rounded-xl border px-5 py-4 shadow-sm ${colors}`}>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide opacity-70">DBS Production Ingest Readiness</p>
+          <h2 className="mt-1 text-lg font-bold">{readiness.label}</h2>
+          <p className="mt-1 text-sm opacity-90">{readiness.message}</p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs font-semibold">
+          <span className="rounded-full bg-white/70 px-3 py-1">{badge}</span>
+          <span className="rounded-full bg-white/70 px-3 py-1">
+            {readiness.autoAssignmentMode === "manual_review" ? "Manual review mode" : "Auto-assignment enabled"}
+          </span>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {readiness.checklist.map((item) => (
+          <div key={item.key} className="rounded-lg bg-white/75 p-3 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-semibold">{item.label}</p>
+              <ReadinessPill status={item.status} />
+            </div>
+            <p className="mt-2 text-xs leading-5 opacity-80">{item.detail}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -215,7 +280,7 @@ export default function DbsDiagnosticsPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-xl font-bold text-[#0d1b2e]">DBS / LIF Diagnostics</h1>
-              <p className="mt-1 text-sm text-gray-500">Handoff receipt audit, duplicate visibility, and assignment configuration.</p>
+              <p className="mt-1 text-sm text-gray-500">Handoff receipt audit, duplicate visibility, assignment configuration, and production ingest readiness.</p>
             </div>
             <AdminNav />
           </div>
@@ -238,6 +303,8 @@ export default function DbsDiagnosticsPage() {
           <div className="rounded-xl border border-gray-200 bg-white py-16 text-center text-sm text-gray-400 shadow-sm">Loading DBS diagnostics…</div>
         ) : data ? (
           <>
+            <ReadinessBanner readiness={data.readiness} />
+
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
               <StatCard label="Recent Events" value={data.summary.recentEvents} helper="DBS ingest attempts logged" />
               <StatCard label="DBS Leads" value={data.summary.recentDbsLeads} helper="Active LIF lead records" />

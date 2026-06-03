@@ -154,6 +154,101 @@ export async function GET(request: Request) {
   const dryRunEvents = events.filter((event) => event.is_dry_run === true || event.ingest_result === "dry_run").length;
   const assignedLeads = activeLeads.filter((lead) => Boolean(lead.assigned_partner_account_id)).length;
 
+  const diagnosticsTableAvailable = !warnings.some((warning) => warning.startsWith("dbs_ingest_events:"));
+  const dbsLeadReceiptFieldsAvailable = !warnings.some((warning) => warning.startsWith("leads:"));
+  const recentSuccessfulCreatedIngest = events.some(
+    (event) => event.ingest_result === "created" && event.is_dry_run !== true
+  );
+  const recentDuplicateTest = events.some(
+    (event) => event.ingest_result === "duplicate" || event.dry_run_result === "would_duplicate"
+  );
+  const recentRejectedNoConsentTest = events.some((event) => {
+    const message = (event.error_message ?? "").toLowerCase();
+    return (
+      (event.ingest_result === "rejected" || event.dry_run_result === "would_reject") &&
+      (event.consent_given !== true || message.includes("consent"))
+    );
+  });
+  const autoAssignmentOff = !settings.auto_assignment_enabled && !settings.auto_assign_new_dbs_leads;
+  const hasRecentMissingConsentCreatedLead = activeLeads.some((lead) => lead.dbs_consent_given !== true);
+
+  const readinessChecklist = [
+    {
+      key: "ingest_secret",
+      label: "LIF_DBS_INGEST_SECRET configured",
+      status: process.env.LIF_DBS_INGEST_SECRET ? "ok" : "action_required",
+      detail: process.env.LIF_DBS_INGEST_SECRET
+        ? "Shared secret is present. Value is not displayed."
+        : "Add LIF_DBS_INGEST_SECRET in Vercel and redeploy.",
+    },
+    {
+      key: "diagnostics_table",
+      label: "DBS ingest diagnostics table available",
+      status: diagnosticsTableAvailable ? "ok" : "action_required",
+      detail: diagnosticsTableAvailable
+        ? "dbs_ingest_events can be queried."
+        : "Run sql/section27_dbs_lif_diagnostics.sql and sql/section28_dbs_ingest_test_controls.sql if needed.",
+    },
+    {
+      key: "receipt_fields",
+      label: "DBS receipt fields available on leads",
+      status: dbsLeadReceiptFieldsAvailable ? "ok" : "action_required",
+      detail: dbsLeadReceiptFieldsAvailable
+        ? "DBS report, consent, receipt, and deletion/reset fields can be queried."
+        : "Run sql/section25_dbs_ingest_receipt_hardening.sql and sql/section26_lead_deletion_reset.sql if needed.",
+    },
+    {
+      key: "successful_ingest",
+      label: "Recent successful DBS ingest observed",
+      status: recentSuccessfulCreatedIngest ? "ok" : "needs_review",
+      detail: recentSuccessfulCreatedIngest
+        ? "At least one recent real DBS ingest created a LIF lead."
+        : "Send one controlled consented test lead from DBS to confirm live receipt.",
+    },
+    {
+      key: "duplicate_test",
+      label: "Recent duplicate protection test observed",
+      status: recentDuplicateTest ? "ok" : "needs_review",
+      detail: recentDuplicateTest
+        ? "A recent duplicate or would-duplicate result was logged."
+        : "Send the same DBS reference again as a dry-run or controlled retry to confirm duplicate handling.",
+    },
+    {
+      key: "no_consent_test",
+      label: "Recent no-consent rejection observed",
+      status: recentRejectedNoConsentTest ? "ok" : "needs_review",
+      detail: recentRejectedNoConsentTest
+        ? "A missing/invalid consent payload was rejected or would be rejected."
+        : "Run a dry-run without consent_given=true to confirm the consent gate blocks it.",
+    },
+    {
+      key: "auto_assignment",
+      label: "Auto-assignment mode visible",
+      status: settingsWarning ? "needs_review" : "ok",
+      detail: settingsWarning
+        ? settingsWarning
+        : autoAssignmentOff
+          ? "Auto-assignment is off. DBS leads will remain available for admin review/manual assignment."
+          : "Auto-assignment is enabled in LIF routing settings. Confirm this is intentional before production handoff.",
+    },
+    {
+      key: "missing_consent_records",
+      label: "Recent active DBS leads preserve consent",
+      status: hasRecentMissingConsentCreatedLead ? "needs_review" : "ok",
+      detail: hasRecentMissingConsentCreatedLead
+        ? "One or more active DBS leads are missing preserved consent details in LIF. Assignment is blocked for those leads."
+        : "Recent active DBS leads have preserved consent details or no DBS leads are present in this view.",
+    },
+  ] as const;
+
+  const actionRequiredCount = readinessChecklist.filter((item) => item.status === "action_required").length;
+  const needsReviewCount = readinessChecklist.filter((item) => item.status === "needs_review").length;
+  const readinessStatus = actionRequiredCount > 0
+    ? "not_ready"
+    : needsReviewCount > 0
+      ? "needs_review"
+      : "ready";
+
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
     warnings,
@@ -179,6 +274,21 @@ export async function GET(request: Request) {
       unassignedLeads: activeLeads.length - assignedLeads,
       consentedLeads: activeLeads.filter((lead) => lead.dbs_consent_given === true).length,
       missingConsentLeads: activeLeads.filter((lead) => lead.dbs_consent_given !== true).length,
+    },
+    readiness: {
+      status: readinessStatus,
+      label: readinessStatus === "ready"
+        ? "Ready for DBS production ingest"
+        : readinessStatus === "needs_review"
+          ? "Needs review before production ingest"
+          : "Not ready for DBS production ingest",
+      message: readinessStatus === "ready"
+        ? "LIF has the required ingest configuration, diagnostics, receipt fields, and recent handoff checks."
+        : "Review the checklist below before regular DBS production handoff.",
+      actionRequiredCount,
+      needsReviewCount,
+      autoAssignmentMode: autoAssignmentOff ? "manual_review" : "auto_assignment_enabled",
+      checklist: readinessChecklist,
     },
     counts: {
       ingestResults: eventCounts,
