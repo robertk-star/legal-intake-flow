@@ -528,3 +528,16 @@ sql/section27_dbs_lif_diagnostics.sql
 6. Use the latest ingest result filter for created, duplicate, dry-run, rejected, and failed events.
 7. Click a `dbs:<lead-id>` external reference and confirm `/admin/dbs-diagnostics` opens filtered to that DBS reference.
 8. Confirm no assignment behavior changed; assignment remains manual/admin-triggered.
+
+## Phase 54 — Consent Visibility Confirmation QA
+
+1. Open `/admin/dbs-diagnostics`.
+2. Use the consent filter:
+   - Consent yes
+   - Consent missing/no
+3. Confirm results filter correctly.
+4. Open a DBS lead in `/admin/leads`.
+5. Confirm consent source and timestamp are visible when present.
+6. Confirm a DBS lead without consent cannot be manually assigned to a partner.
+7. Confirm Assign Best Match is disabled or blocked for a DBS lead without consent.
+8. Confirm non-DBS leads are not affected by this guard.

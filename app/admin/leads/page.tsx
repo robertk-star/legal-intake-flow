@@ -440,6 +440,9 @@ function LeadDetailModal({
   const assignedPartner = partners.find(
     (p) => p.id === (assignedId || lead?.assigned_partner_account_id)
   );
+  const isDbsLeadMissingConsent =
+    lead?.source === "disabilitybenefitsscreening" &&
+    !(lead.dbs_consent_given === true || lead.consent_given === true);
   const topEligiblePartner = eligibility.find((item) => item.eligible) ?? null;
 
   return (
@@ -505,6 +508,11 @@ function LeadDetailModal({
                   <DetailField label="Consent Source" value={lead.dbs_consent_source} />
                   <DetailField label="Consent Timestamp" value={formatDateTime(lead.dbs_consent_timestamp)} />
                 </dl>
+                {isDbsLeadMissingConsent && (
+                  <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    This DBS lead is missing preserved consent details in LIF. Assignment is blocked until DBS sends a consented handoff or this record is corrected.
+                  </p>
+                )}
               </section>
 
               {/* Contact Info */}
@@ -661,7 +669,7 @@ function LeadDetailModal({
                     <button
                       type="button"
                       onClick={handleAssignBestMatch}
-                      disabled={eligibilityLoading || assigningBest || !topEligiblePartner}
+                      disabled={eligibilityLoading || assigningBest || !topEligiblePartner || isDbsLeadMissingConsent}
                       className="rounded-lg bg-[#1a3a5c] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0d1b2e] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {assigningBest ? "Assigning…" : "Assign Best Match"}
@@ -677,6 +685,11 @@ function LeadDetailModal({
                 {bestMatchSuccess && (
                   <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
                     {bestMatchSuccess}
+                  </p>
+                )}
+                {isDbsLeadMissingConsent && (
+                  <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    Assignment is blocked because this DBS lead does not show consent preserved in LIF.
                   </p>
                 )}
 
@@ -720,7 +733,8 @@ function LeadDetailModal({
                           <button
                             type="button"
                             onClick={() => setAssignedId(item.partner.id)}
-                            className="shrink-0 rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white"
+                            disabled={isDbsLeadMissingConsent}
+                            className="shrink-0 rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Select
                           </button>

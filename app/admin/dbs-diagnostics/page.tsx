@@ -68,6 +68,7 @@ type DiagnosticsData = {
     assignedLeads: number;
     unassignedLeads: number;
     consentedLeads: number;
+    missingConsentLeads?: number;
   };
   counts: {
     ingestResults: Record<string, number>;
@@ -145,6 +146,7 @@ export default function DbsDiagnosticsPage() {
   const [search, setSearch] = useState("");
   const [resultFilter, setResultFilter] = useState("all");
   const [dryRunFilter, setDryRunFilter] = useState("all");
+  const [consentFilter, setConsentFilter] = useState("all");
   const [clearMessage, setClearMessage] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
 
@@ -155,6 +157,7 @@ export default function DbsDiagnosticsPage() {
     if (search.trim()) params.set("search", search.trim());
     if (resultFilter !== "all") params.set("result", resultFilter);
     if (dryRunFilter !== "all") params.set("dry_run", dryRunFilter);
+    if (consentFilter !== "all") params.set("consent", consentFilter);
 
     try {
       const res = await fetch(`/api/admin/dbs-diagnostics?${params.toString()}`);
@@ -173,7 +176,7 @@ export default function DbsDiagnosticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, search, resultFilter, dryRunFilter]);
+  }, [router, search, resultFilter, dryRunFilter, consentFilter]);
 
   useEffect(() => {
     fetchDiagnostics();
@@ -242,6 +245,7 @@ export default function DbsDiagnosticsPage() {
               <StatCard label="Duplicates" value={data.summary.duplicateEvents} helper="Existing LIF lead returned" />
               <StatCard label="Dry Runs" value={data.summary.dryRunEvents} helper="Validated without saving" />
               <StatCard label="Problems" value={recentProblemCount} helper="Rejected or failed" />
+              <StatCard label="Consent Missing" value={data.summary.missingConsentLeads ?? 0} helper="Cannot assign until resolved" />
               <StatCard label="Unassigned" value={data.summary.unassignedLeads} helper="Need admin review" />
             </section>
 
@@ -262,7 +266,7 @@ export default function DbsDiagnosticsPage() {
             </section>
 
             <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search DBS ref or report number…" className="rounded-lg border border-gray-300 px-3 py-2 text-sm sm:col-span-2" />
                 <select value={resultFilter} onChange={(e) => setResultFilter(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
                   <option value="all">All results</option>
@@ -276,6 +280,11 @@ export default function DbsDiagnosticsPage() {
                   <option value="all">All modes</option>
                   <option value="true">Dry-run only</option>
                   <option value="false">Real sends only</option>
+                </select>
+                <select value={consentFilter} onChange={(e) => setConsentFilter(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                  <option value="all">All consent statuses</option>
+                  <option value="yes">Consent yes</option>
+                  <option value="no">Consent missing/no</option>
                 </select>
                 <button onClick={fetchDiagnostics} className="rounded-lg bg-[#1a3a5c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0d1b2e]">Apply</button>
               </div>

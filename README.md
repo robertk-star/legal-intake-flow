@@ -1521,3 +1521,23 @@ Phase 53 improves LIF-side visibility for DBS-ingested leads without changing th
 No SQL migration is required for Phase 53.
 
 No new Vercel environment variable is required.
+
+## Phase 54 — Consent Visibility Confirmation
+
+Phase 54 is a small LIF-side companion to the DBS consent cleanup work.
+
+### What changed
+
+- `/admin/dbs-diagnostics` now supports a consent filter for DBS ingest events and received DBS leads.
+- `/api/admin/dbs-diagnostics` supports `?consent=yes` and `?consent=no`.
+- `/admin/leads` clearly warns when a DBS lead is missing preserved consent details in LIF.
+- Manual partner assignment is blocked server-side for DBS leads unless consent is preserved in LIF.
+- Admin-triggered best-match assignment and batch/auto assignment are also blocked for DBS leads without preserved consent.
+
+### SQL / ENV
+
+No new SQL migration is required.
+
+No new Vercel environment variable is required.
+
+This phase uses the existing DBS receipt fields from `sql/section25_dbs_ingest_receipt_hardening.sql`.

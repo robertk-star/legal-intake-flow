@@ -47,6 +47,9 @@ type CurrentLead = {
   id: string;
   assigned_partner_account_id: string | null;
   status: string | null;
+  source: string | null;
+  consent_given: boolean | null;
+  dbs_consent_given: boolean | null;
 };
 
 function normalizeSettings(row: Partial<LeadAssignmentSettings> | null | undefined): LeadAssignmentSettings {
@@ -140,7 +143,7 @@ export async function assignBestMatchToLead(input: {
 
   const { data: currentLead, error: currentLeadError } = await supabaseAdmin
     .from("leads")
-    .select("id, status, assigned_partner_account_id")
+    .select("id, status, source, assigned_partner_account_id, consent_given, dbs_consent_given")
     .eq("id", input.leadId)
     .is("deleted_at", null)
     .single();
@@ -150,6 +153,15 @@ export async function assignBestMatchToLead(input: {
   }
 
   const lead = currentLead as CurrentLead;
+  if (lead.source === "disabilitybenefitsscreening" && !(lead.dbs_consent_given === true || lead.consent_given === true)) {
+    return {
+      assigned: false,
+      skipped: true,
+      leadId: input.leadId,
+      reason: "This DBS lead cannot be assigned because consent is missing or was not preserved in LIF.",
+    };
+  }
+
   const previousPartnerId = lead.assigned_partner_account_id;
   const bestPartnerId = bestMatch.partner.id;
   const reassigned = Boolean(previousPartnerId && previousPartnerId !== bestPartnerId);

@@ -104,7 +104,7 @@ export async function PATCH(
   if ("assigned_partner_account_id" in body) {
     const { data: currentLead, error: currentLeadError } = await supabaseAdmin
       .from("leads")
-      .select("id, assigned_partner_account_id")
+      .select("id, source, assigned_partner_account_id, consent_given, dbs_consent_given")
       .eq("id", id)
       .is("deleted_at", null)
       .single();
@@ -115,6 +115,8 @@ export async function PATCH(
 
     const partnerId = body.assigned_partner_account_id;
     const currentPartnerId = currentLead.assigned_partner_account_id as string | null;
+    const isDbsLead = currentLead.source === "disabilitybenefitsscreening";
+    const hasDbsConsent = currentLead.dbs_consent_given === true || currentLead.consent_given === true;
 
     if (partnerId === null || partnerId === "") {
       if (currentPartnerId !== null) {
@@ -126,6 +128,13 @@ export async function PATCH(
         updates.partner_notes = null;
       }
     } else {
+      if (isDbsLead && !hasDbsConsent) {
+        return NextResponse.json(
+          { error: "This DBS lead cannot be assigned because consent is missing or was not preserved in LIF." },
+          { status: 422 }
+        );
+      }
+
       const nextPartnerId = String(partnerId);
 
       // Verify the partner account exists and is active enough to receive assignments.

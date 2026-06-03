@@ -64,6 +64,7 @@ export async function GET(request: Request) {
   const search = searchParams.get("search")?.trim() ?? "";
   const resultFilter = searchParams.get("result")?.trim() ?? "";
   const dryRunFilter = searchParams.get("dry_run")?.trim() ?? "";
+  const consentFilter = searchParams.get("consent")?.trim() ?? "";
 
   const warnings: string[] = [];
   const { settings, warning: settingsWarning } = await getLeadAssignmentSettings();
@@ -91,6 +92,12 @@ export async function GET(request: Request) {
     eventsQuery = eventsQuery.eq("is_dry_run", false);
   }
 
+  if (consentFilter === "yes") {
+    eventsQuery = eventsQuery.eq("consent_given", true);
+  } else if (consentFilter === "no") {
+    eventsQuery = eventsQuery.or("consent_given.is.null,consent_given.eq.false");
+  }
+
   if (search) {
     eventsQuery = eventsQuery.or(
       `external_reference_id.ilike.%${search}%,dbs_report_number.ilike.%${search}%`
@@ -116,6 +123,12 @@ export async function GET(request: Request) {
     .order("dbs_received_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  if (consentFilter === "yes") {
+    leadsQuery = leadsQuery.eq("dbs_consent_given", true);
+  } else if (consentFilter === "no") {
+    leadsQuery = leadsQuery.or("dbs_consent_given.is.null,dbs_consent_given.eq.false");
+  }
 
   if (search) {
     leadsQuery = leadsQuery.or(
@@ -165,6 +178,7 @@ export async function GET(request: Request) {
       assignedLeads,
       unassignedLeads: activeLeads.length - assignedLeads,
       consentedLeads: activeLeads.filter((lead) => lead.dbs_consent_given === true).length,
+      missingConsentLeads: activeLeads.filter((lead) => lead.dbs_consent_given !== true).length,
     },
     counts: {
       ingestResults: eventCounts,
