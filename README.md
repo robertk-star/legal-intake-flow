@@ -1359,3 +1359,68 @@ sql/section26_lead_deletion_reset.sql
 ### Setup
 
 No new Vercel environment variable is required.
+
+## Phase 51 — End-to-End DBS/LIF Diagnostics & Send Audit
+
+Phase 51 adds an internal LIF-side diagnostics view for DBS handoff activity. It does not create a second ingest endpoint and does not change partner accounts, routing, billing, or Stripe.
+
+### New admin page
+
+```text
+/admin/dbs-diagnostics
+```
+
+This page shows:
+
+- whether `LIF_DBS_INGEST_SECRET` is configured
+- whether LIF auto-assignment settings are on or off
+- recent DBS ingest events
+- created / duplicate / rejected / failed counts
+- DBS external reference values such as `dbs:<lead-id>`
+- DBS report number
+- LIF lead ID
+- consent status/source/timestamp
+- assignment status
+- last safe error message when available
+
+### New API route
+
+```text
+GET /api/admin/dbs-diagnostics
+```
+
+Admin-auth protected. It returns safe diagnostics only and does not expose any secret values.
+
+### Updated ingest endpoint
+
+The existing endpoint remains the only DBS ingest route:
+
+```text
+POST /api/intake/ingest
+```
+
+It now writes non-blocking diagnostic events to `dbs_ingest_events` after the shared-secret gate passes.
+
+### New migration
+
+Run this SQL before testing Phase 51:
+
+```text
+sql/section27_dbs_lif_diagnostics.sql
+```
+
+### Environment variables
+
+No new Vercel environment variables are required. The diagnostics page checks the existing:
+
+```text
+LIF_DBS_INGEST_SECRET
+```
+
+### Behavior
+
+- No second DBS ingest endpoint was created.
+- Unauthorized requests are still rejected before diagnostics logging.
+- Rejected consent/external-reference requests can be logged for troubleshooting after secret verification.
+- Duplicate DBS sends remain duplicate-safe.
+- Auto-assignment settings are visible but not changed.

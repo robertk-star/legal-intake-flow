@@ -478,3 +478,29 @@ Expected:
 8. Confirm the new lead appears in `/admin/leads`.
 9. Confirm partner lead queues do not show the deleted lead.
 10. Confirm `/admin/system-check` passes the lead deletion/reset table checks.
+
+## Phase 51 — DBS/LIF Diagnostics QA
+
+1. Run:
+
+```text
+sql/section27_dbs_lif_diagnostics.sql
+```
+
+2. Confirm `LIF_DBS_INGEST_SECRET` is configured in Vercel.
+
+3. Open:
+
+```text
+/admin/dbs-diagnostics
+```
+
+4. Confirm no secret values are displayed.
+
+5. Send a valid DBS ingest payload and confirm the diagnostics page shows a `created` event.
+
+6. Send the same payload again and confirm the diagnostics page shows a `duplicate` event.
+
+7. Send a payload missing `consent_given: true` and confirm the diagnostics page shows a `rejected` event.
+
+8. Confirm auto-assignment settings display accurately and remain off unless intentionally enabled in `/admin/routing`.
