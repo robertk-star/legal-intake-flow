@@ -504,3 +504,16 @@ sql/section27_dbs_lif_diagnostics.sql
 7. Send a payload missing `consent_given: true` and confirm the diagnostics page shows a `rejected` event.
 
 8. Confirm auto-assignment settings display accurately and remain off unless intentionally enabled in `/admin/routing`.
+
+## Phase 52 — DBS Ingest Test Controls QA
+
+1. Run `sql/section28_dbs_ingest_test_controls.sql` in the LIF Supabase project.
+2. Send a valid DBS payload with `dry_run: true`.
+3. Confirm the response is `would_create` and no lead is created in `/admin/leads`.
+4. Send the same dry-run payload after a real lead exists.
+5. Confirm the response is `would_duplicate` and no lead is updated.
+6. Send a dry-run payload without `consent_given: true`.
+7. Confirm LIF returns `would_reject` and no lead is created.
+8. Open `/admin/dbs-diagnostics`.
+9. Confirm dry-run events show with safe payload summary.
+10. Use **Clear Dry-Run Events** and confirm only dry-run diagnostics are cleared; leads remain unchanged.

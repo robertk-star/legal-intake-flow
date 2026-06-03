@@ -18,6 +18,10 @@ type IngestEventRow = {
   consent_timestamp: string | null;
   received_at: string | null;
   duplicate: boolean | null;
+  is_dry_run: boolean | null;
+  dry_run_result: string | null;
+  dry_run_checked_at: string | null;
+  raw_payload_summary: Record<string, unknown> | null;
   auto_assignment_enabled: boolean | null;
   auto_assign_new_dbs_leads: boolean | null;
   assigned_partner_account_id: string | null;
@@ -59,6 +63,7 @@ export async function GET(request: Request) {
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 200);
   const search = searchParams.get("search")?.trim() ?? "";
   const resultFilter = searchParams.get("result")?.trim() ?? "";
+  const dryRunFilter = searchParams.get("dry_run")?.trim() ?? "";
 
   const warnings: string[] = [];
   const { settings, warning: settingsWarning } = await getLeadAssignmentSettings();
@@ -69,7 +74,8 @@ export async function GET(request: Request) {
     .select(
       "id, created_at, source, external_reference_id, dbs_report_number, lif_lead_id, " +
       "ingest_result, status_code, error_message, consent_given, consent_source, " +
-      "consent_timestamp, received_at, duplicate, auto_assignment_enabled, " +
+      "consent_timestamp, received_at, duplicate, is_dry_run, dry_run_result, " +
+      "dry_run_checked_at, raw_payload_summary, auto_assignment_enabled, " +
       "auto_assign_new_dbs_leads, assigned_partner_account_id, response_summary"
     )
     .order("created_at", { ascending: false })
@@ -77,6 +83,12 @@ export async function GET(request: Request) {
 
   if (resultFilter && resultFilter !== "all") {
     eventsQuery = eventsQuery.eq("ingest_result", resultFilter);
+  }
+
+  if (dryRunFilter === "true") {
+    eventsQuery = eventsQuery.eq("is_dry_run", true);
+  } else if (dryRunFilter === "false") {
+    eventsQuery = eventsQuery.eq("is_dry_run", false);
   }
 
   if (search) {
@@ -123,9 +135,10 @@ export async function GET(request: Request) {
   const eventCounts = countBy(events.map((event) => event.ingest_result));
   const leadStatusCounts = countBy(activeLeads.map((lead) => lead.status));
 
-  const rejectedEvents = events.filter((event) => event.ingest_result === "rejected").length;
-  const failedEvents = events.filter((event) => event.ingest_result === "failed").length;
-  const duplicateEvents = events.filter((event) => event.ingest_result === "duplicate").length;
+  const rejectedEvents = events.filter((event) => event.ingest_result === "rejected" || event.dry_run_result === "would_reject").length;
+  const failedEvents = events.filter((event) => event.ingest_result === "failed" || event.dry_run_result === "would_fail_validation").length;
+  const duplicateEvents = events.filter((event) => event.ingest_result === "duplicate" || event.dry_run_result === "would_duplicate").length;
+  const dryRunEvents = events.filter((event) => event.is_dry_run === true || event.ingest_result === "dry_run").length;
   const assignedLeads = activeLeads.filter((lead) => Boolean(lead.assigned_partner_account_id)).length;
 
   return NextResponse.json({
@@ -146,6 +159,7 @@ export async function GET(request: Request) {
       recentDbsLeads: activeLeads.length,
       createdEvents: eventCounts.created ?? 0,
       duplicateEvents,
+      dryRunEvents,
       rejectedEvents,
       failedEvents,
       assignedLeads,

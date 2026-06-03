@@ -3,7 +3,8 @@ import { rateLimitResponse } from "@/lib/rateLimit";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { assignBestMatchToLead, getLeadAssignmentSettings } from "@/lib/leadAssignmentEngine";
 
-type DbsIngestResult = "created" | "duplicate" | "rejected" | "failed" | "received";
+type DbsIngestResult = "created" | "duplicate" | "rejected" | "failed" | "received" | "dry_run";
+type DbsDryRunResult = "would_create" | "would_duplicate" | "would_reject" | "would_fail_validation";
 
 type DbsIngestEventInput = {
   externalReferenceId?: string | null;
@@ -22,7 +23,11 @@ type DbsIngestEventInput = {
   autoAssignmentResult?: unknown;
   assignedPartnerAccountId?: string | null;
   rawPayload?: Record<string, unknown> | null;
+  rawPayloadSummary?: Record<string, unknown> | null;
   responseSummary?: Record<string, unknown> | null;
+  isDryRun?: boolean;
+  dryRunResult?: DbsDryRunResult | null;
+  dryRunCheckedAt?: string | null;
 };
 
 function str(val: unknown): string | null {
@@ -37,6 +42,30 @@ function parseOptionalTimestamp(val: unknown): string | null | "invalid" {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "invalid";
   return date.toISOString();
+}
+
+function isDryRunValue(value: unknown) {
+  return value === true || value === "true" || value === "1";
+}
+
+function buildPayloadSummary(body: Record<string, unknown>) {
+  return {
+    external_reference_id: str(body.external_reference_id),
+    dbs_report_number: str(body.dbs_report_number) ?? str(body.report_number),
+    consent_given: body.consent_given === true,
+    consent_source: str(body.consent_source),
+    consent_timestamp: str(body.consent_timestamp),
+    has_first_name: Boolean(str(body.first_name)),
+    has_last_name: Boolean(str(body.last_name)),
+    has_phone: Boolean(str(body.phone)),
+    has_email: Boolean(str(body.email)),
+    state: str(body.state)?.toUpperCase() ?? null,
+    benefit_type: str(body.benefit_type),
+    application_status: str(body.application_status),
+    has_medical_summary: Boolean(str(body.medical_summary)),
+    has_additional_notes: Boolean(str(body.additional_notes)),
+    dry_run: isDryRunValue(body.dry_run),
+  };
 }
 
 async function logDbsIngestEvent(input: DbsIngestEventInput) {
@@ -59,7 +88,11 @@ async function logDbsIngestEvent(input: DbsIngestEventInput) {
       auto_assignment_result: input.autoAssignmentResult ?? null,
       assigned_partner_account_id: input.assignedPartnerAccountId ?? null,
       raw_payload: input.rawPayload ?? null,
+      raw_payload_summary: input.rawPayloadSummary ?? null,
       response_summary: input.responseSummary ?? null,
+      is_dry_run: input.isDryRun ?? false,
+      dry_run_result: input.dryRunResult ?? null,
+      dry_run_checked_at: input.dryRunCheckedAt ?? null,
     });
 
     if (error) {
@@ -68,6 +101,26 @@ async function logDbsIngestEvent(input: DbsIngestEventInput) {
   } catch (error) {
     console.warn("[POST /api/intake/ingest] Non-blocking DBS ingest audit insert threw:", error);
   }
+}
+
+function dryRunResponse(input: {
+  result: DbsDryRunResult;
+  message: string;
+  existingLeadId?: string;
+  duplicate?: boolean;
+  status?: number;
+  error?: string;
+}) {
+  const payload = {
+    success: !input.error,
+    dryRun: true,
+    result: input.result,
+    message: input.message,
+    ...(input.existingLeadId ? { existingLeadId: input.existingLeadId } : {}),
+    ...(input.duplicate !== undefined ? { duplicate: input.duplicate } : {}),
+    ...(input.error ? { error: input.error } : {}),
+  };
+  return NextResponse.json(payload, { status: input.status ?? (input.error ? 400 : 200) });
 }
 
 /**
@@ -83,10 +136,9 @@ async function logDbsIngestEvent(input: DbsIngestEventInput) {
  *   external_reference_id must be stable and start with "dbs:"
  *   dbs_report_number is display/search metadata only, never the duplicate key
  *
- * Duplicate detection:
- *   source + external_reference_id is the duplicate key. If DBS sends the same
- *   lead again, LIF returns the existing LIF lead ID and updates receipt metadata
- *   without creating a duplicate or changing the original created_at.
+ * Test controls:
+ *   dry_run: true validates the same contract and duplicate key without inserting,
+ *   updating, assigning, or notifying anyone.
  */
 export async function POST(request: Request) {
   const limited = rateLimitResponse(request, { keyPrefix: "dbs-ingest", limit: 120, windowMs: 60 * 1000 });
@@ -120,6 +172,8 @@ export async function POST(request: Request) {
   }
 
   const body = raw as Record<string, unknown>;
+  const dryRun = isDryRunValue(body.dry_run);
+  const rawPayloadSummary = buildPayloadSummary(body);
 
   // ── 3. Extract and sanitize accepted fields ─────────────────────────────────
   const externalReferenceId = str(body.external_reference_id);
@@ -138,62 +192,81 @@ export async function POST(request: Request) {
   const consentSource       = str(body.consent_source);
   const consentTimestamp    = parseOptionalTimestamp(body.consent_timestamp);
   const receivedAt          = new Date().toISOString();
+  const dryRunCheckedAt     = dryRun ? receivedAt : null;
 
   // ── 4. DBS receipt validation ──────────────────────────────────────────────
   if (body.consent_given !== true) {
+    const errorMessage = "Missing required consent confirmation.";
     await logDbsIngestEvent({
       externalReferenceId,
       dbsReportNumber,
-      result: "rejected",
+      result: dryRun ? "dry_run" : "rejected",
       statusCode: 400,
-      errorMessage: "Missing required consent confirmation.",
+      errorMessage,
       consentGiven: body.consent_given === true,
       consentSource,
       consentTimestamp: consentTimestamp === "invalid" ? null : consentTimestamp,
       receivedAt,
-      rawPayload: body,
+      rawPayload: dryRun ? null : body,
+      rawPayloadSummary,
+      isDryRun: dryRun,
+      dryRunResult: dryRun ? "would_reject" : null,
+      dryRunCheckedAt,
+      responseSummary: dryRun ? { success: false, dryRun: true, result: "would_reject", error: errorMessage } : null,
     });
-    return NextResponse.json(
-      { error: "Missing required consent confirmation." },
-      { status: 400 }
-    );
+    if (dryRun) {
+      return dryRunResponse({ result: "would_reject", error: errorMessage, message: errorMessage });
+    }
+    return NextResponse.json({ error: errorMessage }, { status: 400 });
   }
 
   if (!externalReferenceId || !externalReferenceId.startsWith("dbs:")) {
+    const errorMessage = "Missing required stable DBS external reference.";
     await logDbsIngestEvent({
       externalReferenceId,
       dbsReportNumber,
-      result: "rejected",
+      result: dryRun ? "dry_run" : "rejected",
       statusCode: 400,
-      errorMessage: "Missing required stable DBS external reference.",
+      errorMessage,
       consentGiven: true,
       consentSource,
       consentTimestamp: consentTimestamp === "invalid" ? null : consentTimestamp,
       receivedAt,
-      rawPayload: body,
+      rawPayload: dryRun ? null : body,
+      rawPayloadSummary,
+      isDryRun: dryRun,
+      dryRunResult: dryRun ? "would_reject" : null,
+      dryRunCheckedAt,
+      responseSummary: dryRun ? { success: false, dryRun: true, result: "would_reject", error: errorMessage } : null,
     });
-    return NextResponse.json(
-      { error: "Missing required stable DBS external reference." },
-      { status: 400 }
-    );
+    if (dryRun) {
+      return dryRunResponse({ result: "would_reject", error: errorMessage, message: errorMessage });
+    }
+    return NextResponse.json({ error: errorMessage }, { status: 400 });
   }
 
   if (consentTimestamp === "invalid") {
+    const errorMessage = "Invalid consent timestamp.";
     await logDbsIngestEvent({
       externalReferenceId,
       dbsReportNumber,
-      result: "rejected",
+      result: dryRun ? "dry_run" : "rejected",
       statusCode: 400,
-      errorMessage: "Invalid consent timestamp.",
+      errorMessage,
       consentGiven: true,
       consentSource,
       receivedAt,
-      rawPayload: body,
+      rawPayload: dryRun ? null : body,
+      rawPayloadSummary,
+      isDryRun: dryRun,
+      dryRunResult: dryRun ? "would_reject" : null,
+      dryRunCheckedAt,
+      responseSummary: dryRun ? { success: false, dryRun: true, result: "would_reject", error: errorMessage } : null,
     });
-    return NextResponse.json(
-      { error: "Invalid consent timestamp." },
-      { status: 400 }
-    );
+    if (dryRun) {
+      return dryRunResponse({ result: "would_reject", error: errorMessage, message: errorMessage });
+    }
+    return NextResponse.json({ error: errorMessage }, { status: 400 });
   }
 
   const receiptMetadata = {
@@ -215,23 +288,93 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (lookupError) {
+    const errorMessage = "Failed to check for duplicate lead.";
     console.error("[POST /api/intake/ingest] Duplicate lookup error:", lookupError);
     await logDbsIngestEvent({
       externalReferenceId,
       dbsReportNumber,
-      result: "failed",
+      result: dryRun ? "dry_run" : "failed",
       statusCode: 500,
-      errorMessage: "Failed to check for duplicate lead.",
+      errorMessage,
       consentGiven: true,
       consentSource,
       consentTimestamp,
       receivedAt,
-      rawPayload: body,
+      rawPayload: dryRun ? null : body,
+      rawPayloadSummary,
+      isDryRun: dryRun,
+      dryRunResult: dryRun ? "would_fail_validation" : null,
+      dryRunCheckedAt,
+      responseSummary: dryRun ? { success: false, dryRun: true, result: "would_fail_validation", error: errorMessage } : null,
     });
-    return NextResponse.json(
-      { error: "Failed to check for duplicate lead." },
-      { status: 500 }
-    );
+    if (dryRun) {
+      return dryRunResponse({ result: "would_fail_validation", error: errorMessage, message: errorMessage, status: 500 });
+    }
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+
+  if (dryRun) {
+    if (existing) {
+      const responseSummary = {
+        success: true,
+        dryRun: true,
+        result: "would_duplicate",
+        existingLeadId: existing.id,
+        duplicate: true,
+        message: "A lead with this DBS reference already exists. No lead was created or updated because dry_run is true.",
+      };
+      await logDbsIngestEvent({
+        externalReferenceId,
+        dbsReportNumber,
+        leadId: existing.id,
+        result: "dry_run",
+        statusCode: 200,
+        consentGiven: true,
+        consentSource,
+        consentTimestamp,
+        receivedAt,
+        duplicate: true,
+        assignedPartnerAccountId: (existing as { assigned_partner_account_id?: string | null }).assigned_partner_account_id ?? null,
+        rawPayload: null,
+        rawPayloadSummary,
+        responseSummary,
+        isDryRun: true,
+        dryRunResult: "would_duplicate",
+        dryRunCheckedAt,
+      });
+      return dryRunResponse({
+        result: "would_duplicate",
+        existingLeadId: existing.id,
+        duplicate: true,
+        message: responseSummary.message,
+      });
+    }
+
+    const responseSummary = {
+      success: true,
+      dryRun: true,
+      result: "would_create",
+      duplicate: false,
+      message: "Payload is valid. No lead was created because dry_run is true.",
+    };
+    await logDbsIngestEvent({
+      externalReferenceId,
+      dbsReportNumber,
+      result: "dry_run",
+      statusCode: 200,
+      consentGiven: true,
+      consentSource,
+      consentTimestamp,
+      receivedAt,
+      duplicate: false,
+      rawPayload: null,
+      rawPayloadSummary,
+      responseSummary,
+      isDryRun: true,
+      dryRunResult: "would_create",
+      dryRunCheckedAt,
+    });
+    return dryRunResponse({ result: "would_create", duplicate: false, message: responseSummary.message });
   }
 
   if (existing) {
@@ -255,11 +398,9 @@ export async function POST(request: Request) {
         receivedAt,
         duplicate: true,
         rawPayload: body,
+        rawPayloadSummary,
       });
-      return NextResponse.json(
-        { error: "Failed to update existing lead receipt metadata." },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Failed to update existing lead receipt metadata." }, { status: 500 });
     }
 
     await logDbsIngestEvent({
@@ -274,14 +415,12 @@ export async function POST(request: Request) {
       receivedAt,
       duplicate: true,
       rawPayload: body,
+      rawPayloadSummary,
       assignedPartnerAccountId: (existing as { assigned_partner_account_id?: string | null }).assigned_partner_account_id ?? null,
       responseSummary: { success: true, leadId: existing.id, duplicate: true },
     });
 
-    return NextResponse.json(
-      { success: true, leadId: existing.id, duplicate: true },
-      { status: 200 }
-    );
+    return NextResponse.json({ success: true, leadId: existing.id, duplicate: true }, { status: 200 });
   }
 
   // ── 6. Insert into public.leads ─────────────────────────────────────────────
@@ -325,10 +464,7 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (duplicate) {
-        await supabaseAdmin
-          .from("leads")
-          .update(receiptMetadata)
-          .eq("id", duplicate.id);
+        await supabaseAdmin.from("leads").update(receiptMetadata).eq("id", duplicate.id);
 
         await logDbsIngestEvent({
           externalReferenceId,
@@ -342,14 +478,12 @@ export async function POST(request: Request) {
           receivedAt,
           duplicate: true,
           rawPayload: body,
+          rawPayloadSummary,
           assignedPartnerAccountId: (duplicate as { assigned_partner_account_id?: string | null }).assigned_partner_account_id ?? null,
           responseSummary: { success: true, leadId: duplicate.id, duplicate: true, recoveredFromUniqueConstraint: true },
         });
 
-        return NextResponse.json(
-          { success: true, leadId: duplicate.id, duplicate: true },
-          { status: 200 }
-        );
+        return NextResponse.json({ success: true, leadId: duplicate.id, duplicate: true }, { status: 200 });
       }
     }
 
@@ -365,6 +499,7 @@ export async function POST(request: Request) {
       consentTimestamp,
       receivedAt,
       rawPayload: body,
+      rawPayloadSummary,
     });
     return NextResponse.json({ error: "Failed to store lead." }, { status: 500 });
   }
@@ -402,6 +537,7 @@ export async function POST(request: Request) {
     autoAssignmentResult: autoAssignment,
     assignedPartnerAccountId: (data as { assigned_partner_account_id?: string | null }).assigned_partner_account_id ?? null,
     rawPayload: body,
+    rawPayloadSummary,
     responseSummary: createdResponse,
   });
 

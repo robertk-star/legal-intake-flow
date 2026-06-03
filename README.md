@@ -1424,3 +1424,72 @@ LIF_DBS_INGEST_SECRET
 - Rejected consent/external-reference requests can be logged for troubleshooting after secret verification.
 - Duplicate DBS sends remain duplicate-safe.
 - Auto-assignment settings are visible but not changed.
+
+## Phase 52 — DBS Ingest Test Controls
+
+Phase 52 adds dry-run validation support to the existing DBS → LIF ingest endpoint.
+
+### Existing endpoint retained
+
+No duplicate ingest route was created. DBS should continue using:
+
+```text
+POST /api/intake/ingest
+```
+
+### Dry-run request
+
+DBS may send the normal payload with:
+
+```json
+{
+  "dry_run": true
+}
+```
+
+When `dry_run` is true, LIF validates:
+
+- `x-lif-ingest-secret`
+- JSON shape
+- `consent_given === true`
+- stable `external_reference_id` beginning with `dbs:`
+- consent timestamp format
+- duplicate status for `source + external_reference_id`
+
+Dry-run requests do **not**:
+
+- insert a lead
+- update an existing lead
+- assign a partner
+- send notifications
+- trigger billing or partner workflows
+
+### Dry-run responses
+
+Possible responses include:
+
+```json
+{ "success": true, "dryRun": true, "result": "would_create" }
+```
+
+```json
+{ "success": true, "dryRun": true, "result": "would_duplicate", "existingLeadId": "..." }
+```
+
+```json
+{ "success": false, "dryRun": true, "result": "would_reject", "error": "Missing required consent confirmation." }
+```
+
+### Diagnostics
+
+`/admin/dbs-diagnostics` now shows dry-run events, dry-run result, safe payload summary, and includes a clear action for dry-run diagnostic events only.
+
+### Migration
+
+Run before testing Phase 52:
+
+```text
+sql/section28_dbs_ingest_test_controls.sql
+```
+
+No new Vercel environment variables are required.

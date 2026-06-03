@@ -17,6 +17,10 @@ type DbsIngestEvent = {
   consent_timestamp: string | null;
   received_at: string | null;
   duplicate: boolean | null;
+  is_dry_run: boolean | null;
+  dry_run_result: string | null;
+  dry_run_checked_at: string | null;
+  raw_payload_summary: Record<string, unknown> | null;
   auto_assignment_enabled: boolean | null;
   auto_assign_new_dbs_leads: boolean | null;
   assigned_partner_account_id: string | null;
@@ -60,6 +64,7 @@ type DiagnosticsData = {
     duplicateEvents: number;
     rejectedEvents: number;
     failedEvents: number;
+    dryRunEvents: number;
     assignedLeads: number;
     unassignedLeads: number;
     consentedLeads: number;
@@ -78,6 +83,7 @@ const RESULT_STYLES: Record<string, string> = {
   rejected: "bg-yellow-100 text-yellow-800",
   failed: "bg-red-100 text-red-800",
   received: "bg-gray-100 text-gray-700",
+  dry_run: "bg-purple-100 text-purple-800",
 };
 
 function formatDateTime(iso: string | null | undefined) {
@@ -138,6 +144,9 @@ export default function DbsDiagnosticsPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [resultFilter, setResultFilter] = useState("all");
+  const [dryRunFilter, setDryRunFilter] = useState("all");
+  const [clearMessage, setClearMessage] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
 
   const fetchDiagnostics = useCallback(async () => {
     setLoading(true);
@@ -145,6 +154,7 @@ export default function DbsDiagnosticsPage() {
     const params = new URLSearchParams();
     if (search.trim()) params.set("search", search.trim());
     if (resultFilter !== "all") params.set("result", resultFilter);
+    if (dryRunFilter !== "all") params.set("dry_run", dryRunFilter);
 
     try {
       const res = await fetch(`/api/admin/dbs-diagnostics?${params.toString()}`);
@@ -163,7 +173,7 @@ export default function DbsDiagnosticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, search, resultFilter]);
+  }, [router, search, resultFilter, dryRunFilter]);
 
   useEffect(() => {
     fetchDiagnostics();
@@ -173,6 +183,27 @@ export default function DbsDiagnosticsPage() {
     if (!data) return 0;
     return data.summary.rejectedEvents + data.summary.failedEvents;
   }, [data]);
+
+
+  async function clearDryRunEvents() {
+    if (!confirm("Clear dry-run diagnostics events only? This will not delete or change any leads.")) return;
+    setClearing(true);
+    setClearMessage(null);
+    try {
+      const res = await fetch("/api/admin/dbs-diagnostics/clear-test-events", { method: "POST" });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setClearMessage(payload.error ?? "Failed to clear dry-run events.");
+        return;
+      }
+      setClearMessage(`Cleared ${payload.deletedCount ?? 0} dry-run event${payload.deletedCount === 1 ? "" : "s"}.`);
+      await fetchDiagnostics();
+    } catch {
+      setClearMessage("Network error while clearing dry-run events.");
+    } finally {
+      setClearing(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -209,6 +240,7 @@ export default function DbsDiagnosticsPage() {
               <StatCard label="DBS Leads" value={data.summary.recentDbsLeads} helper="Active LIF lead records" />
               <StatCard label="Created" value={data.summary.createdEvents} helper="Accepted as new" />
               <StatCard label="Duplicates" value={data.summary.duplicateEvents} helper="Existing LIF lead returned" />
+              <StatCard label="Dry Runs" value={data.summary.dryRunEvents} helper="Validated without saving" />
               <StatCard label="Problems" value={recentProblemCount} helper="Rejected or failed" />
               <StatCard label="Unassigned" value={data.summary.unassignedLeads} helper="Need admin review" />
             </section>
@@ -217,7 +249,7 @@ export default function DbsDiagnosticsPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-[#0d1b2e]">Configuration Snapshot</h2>
-                  <p className="mt-1 text-sm text-gray-500">Secret values are never displayed.</p>
+                  <p className="mt-1 text-sm text-gray-500">Secret values are never displayed. Dry-run requests validate the contract without creating, updating, assigning, or notifying.</p>
                 </div>
                 <button onClick={fetchDiagnostics} className="rounded-lg border border-[#1a3a5c] px-4 py-2 text-sm font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white">Refresh</button>
               </div>
@@ -230,17 +262,30 @@ export default function DbsDiagnosticsPage() {
             </section>
 
             <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search DBS ref or report number…" className="rounded-lg border border-gray-300 px-3 py-2 text-sm sm:col-span-2" />
                 <select value={resultFilter} onChange={(e) => setResultFilter(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
                   <option value="all">All results</option>
                   <option value="created">Created</option>
                   <option value="duplicate">Duplicate</option>
+                  <option value="dry_run">Dry Run</option>
                   <option value="rejected">Rejected</option>
                   <option value="failed">Failed</option>
                 </select>
+                <select value={dryRunFilter} onChange={(e) => setDryRunFilter(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                  <option value="all">All modes</option>
+                  <option value="true">Dry-run only</option>
+                  <option value="false">Real sends only</option>
+                </select>
                 <button onClick={fetchDiagnostics} className="rounded-lg bg-[#1a3a5c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0d1b2e]">Apply</button>
               </div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-gray-500">Dry-run events are diagnostics only. Clearing them does not delete or change any leads.</p>
+                <button onClick={clearDryRunEvents} disabled={clearing} className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">
+                  {clearing ? "Clearing…" : "Clear Dry-Run Events"}
+                </button>
+              </div>
+              {clearMessage && <p className="mt-2 text-xs text-gray-600">{clearMessage}</p>}
             </section>
 
             <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -256,6 +301,7 @@ export default function DbsDiagnosticsPage() {
                       <tr>
                         <th className="px-4 py-3 text-left">Time</th>
                         <th className="px-4 py-3 text-left">Result</th>
+                        <th className="px-4 py-3 text-left">Mode</th>
                         <th className="px-4 py-3 text-left">DBS Ref</th>
                         <th className="px-4 py-3 text-left">Report</th>
                         <th className="px-4 py-3 text-left">Consent</th>
@@ -269,13 +315,20 @@ export default function DbsDiagnosticsPage() {
                         <tr key={event.id} className="align-top hover:bg-gray-50">
                           <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{formatDateTime(event.created_at)}</td>
                           <td className="px-4 py-3"><ResultPill result={event.ingest_result} /></td>
+                          <td className="px-4 py-3 text-xs text-gray-600">{event.is_dry_run ? <span className="rounded-full bg-purple-100 px-2 py-0.5 font-semibold text-purple-800">Dry Run</span> : "Real"}</td>
                           <td className="px-4 py-3 font-mono text-xs text-gray-600">{event.external_reference_id ?? "—"}</td>
                           <td className="px-4 py-3 text-gray-600">{event.dbs_report_number ?? "—"}</td>
                           <td className="px-4 py-3"><StatusPill ok={event.consent_given === true} yes="Yes" no="No" /></td>
                           <td className="px-4 py-3 font-mono text-xs text-gray-600">{event.lif_lead_id ?? "—"}</td>
                           <td className="px-4 py-3 text-xs text-gray-600">{event.assigned_partner_account_id ? "Assigned" : "Unassigned"}</td>
                           <td className="max-w-xs px-4 py-3 text-xs text-gray-600">
-                            {event.error_message ? <span className="text-red-600">{event.error_message}</span> : event.duplicate ? "Duplicate accepted" : "—"}
+                            {event.error_message ? <span className="text-red-600">{event.error_message}</span> : event.dry_run_result ? event.dry_run_result.replace(/_/g, " ") : event.duplicate ? "Duplicate accepted" : "—"}
+                            {event.raw_payload_summary && (
+                              <details className="mt-2">
+                                <summary className="cursor-pointer text-gray-400 hover:text-gray-600">Payload summary</summary>
+                                <pre className="mt-1 max-h-40 overflow-auto rounded bg-gray-50 p-2 text-[11px] text-gray-500">{JSON.stringify(event.raw_payload_summary, null, 2)}</pre>
+                              </details>
+                            )}
                           </td>
                         </tr>
                       ))}
