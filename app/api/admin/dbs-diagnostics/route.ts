@@ -139,7 +139,7 @@ export async function GET(request: Request) {
       autoAssignNewDbsLeads: settings.auto_assign_new_dbs_leads,
       notifyPartnerOnAutoAssignment: settings.notify_partner_on_auto_assignment,
       minimumRoutingScore: settings.minimum_score,
-      requireZeroBlockers: settings.require_zero_blockers,
+      requireZeroBlockers: settings.require_no_blockers,
     },
     summary: {
       recentEvents: events.length,
