@@ -16,7 +16,9 @@ export type PartnerRoutingRecord = {
   lead_status: string | null;
   monthly_lead_capacity: string | null;
   states_served: string | null;
+  routing_scope: string | null;
   routing_states: string[] | null;
+  routing_excluded_states: string[] | null;
   accepted_case_types: string[] | null;
   accepts_initial_filings: boolean | null;
   accepts_appeals: boolean | null;
@@ -38,7 +40,9 @@ export type PartnerEligibilityResult = {
     status: string | null;
     accepting_leads: boolean | null;
     lead_status: string | null;
+    routing_scope: string | null;
     routing_states: string[];
+    routing_excluded_states: string[];
     accepted_case_types: string[];
     monthly_lead_capacity: string | null;
     monthly_assigned_count: number;
@@ -70,6 +74,12 @@ function parseStates(statesServed: string | null | undefined, routingStates: str
         .map((state) => normalizeState(state))
         .filter((state): state is string => Boolean(state))
     )
+  );
+}
+
+function normalizeStateList(values: string[] | null | undefined): string[] {
+  return Array.from(
+    new Set((values ?? []).map((state) => normalizeState(state)).filter((state): state is string => Boolean(state)))
   );
 }
 
@@ -132,9 +142,18 @@ export function evaluatePartnerEligibility(
   }
 
   const leadState = normalizeState(lead.state);
+  const routingScope = partner.routing_scope === "united_states" ? "united_states" : "selected_states";
   const partnerStates = parseStates(partner.states_served, partner.routing_states);
+  const excludedStates = normalizeStateList(partner.routing_excluded_states);
   if (leadState) {
-    if (partnerStates.length === 0) {
+    if (routingScope === "united_states") {
+      if (excludedStates.includes(leadState)) {
+        blockers.push(`${leadState} is excluded from nationwide coverage.`);
+      } else {
+        matchedRules.push(`Nationwide coverage includes ${leadState}`);
+        score += 25;
+      }
+    } else if (partnerStates.length === 0) {
       blockers.push("No routing states configured.");
     } else if (!partnerStates.includes(leadState)) {
       blockers.push(`Does not serve ${leadState}.`);
@@ -147,21 +166,20 @@ export function evaluatePartnerEligibility(
   }
 
   const benefits = requiredBenefits(lead.benefit_type);
-  const partnerBenefits = partner.accepted_case_types ?? [];
+  const partnerBenefits = partner.accepted_case_types && partner.accepted_case_types.length > 0
+    ? partner.accepted_case_types
+    : ["SSDI", "SSI"];
   if (benefits.length > 0) {
-    if (partnerBenefits.length === 0) {
-      blockers.push("No accepted benefit programs configured.");
+    const missing = benefits.filter((benefit) => !partnerBenefits.includes(benefit));
+    if (missing.length > 0) {
+      blockers.push(`Does not accept ${missing.join("/")} leads.`);
     } else {
-      const missing = benefits.filter((benefit) => !partnerBenefits.includes(benefit));
-      if (missing.length > 0) {
-        blockers.push(`Does not accept ${missing.join("/")} leads.`);
-      } else {
-        matchedRules.push(`Accepts ${benefits.join("/")}`);
-        score += 20;
-      }
+      matchedRules.push("Accepts Social Security Disability leads");
+      score += 20;
     }
   } else {
-    warnings.push("Benefit type is missing or not specific.");
+    matchedRules.push("Social Security Disability program accepted");
+    score += 10;
   }
 
   const stage = requiredStage(lead.application_status);
@@ -198,8 +216,10 @@ export function evaluatePartnerEligibility(
       status: partner.status,
       accepting_leads: partner.accepting_leads,
       lead_status: partner.lead_status,
+      routing_scope: routingScope,
       routing_states: partnerStates,
-      accepted_case_types: partner.accepted_case_types ?? [],
+      routing_excluded_states: excludedStates,
+      accepted_case_types: partnerBenefits,
       monthly_lead_capacity: partner.monthly_lead_capacity,
       monthly_assigned_count: monthlyAssignedCount,
       lead_notes: partner.lead_notes,
@@ -228,7 +248,7 @@ export async function getPartnerEligibilityForLeadId(leadId: string) {
     .from("partner_accounts")
     .select(
       "id, firm_name, email, status, accepting_leads, lead_status, monthly_lead_capacity, " +
-      "states_served, routing_states, accepted_case_types, accepts_initial_filings, " +
+      "states_served, routing_scope, routing_states, routing_excluded_states, accepted_case_types, accepts_initial_filings, " +
       "accepts_appeals, accepts_hearings, accepts_child_cases, accepted_languages, lead_notes"
     )
     .order("firm_name", { ascending: true });

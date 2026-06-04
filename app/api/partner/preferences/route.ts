@@ -7,16 +7,11 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 const VALID_LEAD_STATUSES = ["active", "paused", "at_capacity"] as const;
 type LeadStatus = typeof VALID_LEAD_STATUSES[number];
 
-// accepted_case_types stores benefit program tags only (SSDI / SSI).
-// Case stage preferences (appeals, hearings, etc.) are stored in the
-// boolean columns: accepts_initial_filings, accepts_appeals,
-// accepts_hearings, accepts_child_cases.
-const VALID_CASE_TYPES = [
-  "SSDI",
-  "SSI",
-] as const;
+const VALID_ROUTING_SCOPES = ["united_states", "selected_states"] as const;
+type RoutingScope = typeof VALID_ROUTING_SCOPES[number];
 
-const VALID_LANGUAGES = ["English", "Spanish"] as const;
+const DEFAULT_CASE_TYPES = ["SSDI", "SSI"];
+const DEFAULT_LANGUAGES = ["English"];
 
 function normalizeRoutingState(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -26,15 +21,24 @@ function normalizeRoutingState(value: unknown): string | null {
   return normalized;
 }
 
+function normalizeRoutingStateArray(value: unknown): { states: string[]; invalidCount: number } {
+  if (!Array.isArray(value)) return { states: [], invalidCount: 0 };
+  const normalized = (value as unknown[])
+    .map(normalizeRoutingState)
+    .filter((state): state is string => Boolean(state));
+  return {
+    states: Array.from(new Set(normalized)),
+    invalidCount: value.length - normalized.length,
+  };
+}
+
 // ── PATCH /api/partner/preferences ────────────────────────────────────────────
 
 /**
  * Updates the authenticated partner's intake preferences.
- * Only updates the preference fields — never touches profile fields
- * (firm_name, email, phone, etc.) or account status.
+ * Only updates preference fields — never touches firm profile fields or account status.
  */
 export async function PATCH(request: NextRequest) {
-  // ── Auth ────────────────────────────────────────────────────────────────────
   const partnerId = await getAuthenticatedPartnerId();
 
   if (!partnerId) {
@@ -44,7 +48,6 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  // ── Parse body ──────────────────────────────────────────────────────────────
   let body: unknown;
   try {
     body = await request.json();
@@ -63,65 +66,43 @@ export async function PATCH(request: NextRequest) {
   }
 
   const raw = body as Record<string, unknown>;
-
-  // ── Validate fields ─────────────────────────────────────────────────────────
   const errors: string[] = [];
 
-  // accepting_leads — boolean required
   if (typeof raw.accepting_leads !== "boolean") {
     errors.push("accepting_leads must be a boolean.");
   }
 
-  // lead_status — must be one of the allowed values
   if (!VALID_LEAD_STATUSES.includes(raw.lead_status as LeadStatus)) {
     errors.push(`lead_status must be one of: ${VALID_LEAD_STATUSES.join(", ")}.`);
   }
 
-  // monthly_lead_capacity — non-empty string
   if (typeof raw.monthly_lead_capacity !== "string" || !raw.monthly_lead_capacity.trim()) {
     errors.push("monthly_lead_capacity must be a non-empty string.");
   }
 
-  // routing_states — array of two-letter state abbreviations (can be empty)
-  let routingStates: string[] = [];
+  const routingScope: RoutingScope = VALID_ROUTING_SCOPES.includes(raw.routing_scope as RoutingScope)
+    ? raw.routing_scope as RoutingScope
+    : "selected_states";
+
+  const routingStatesResult = normalizeRoutingStateArray(raw.routing_states);
+  const excludedStatesResult = normalizeRoutingStateArray(raw.routing_excluded_states);
+
   if (!Array.isArray(raw.routing_states)) {
     errors.push("routing_states must be an array.");
-  } else {
-    const normalized = (raw.routing_states as unknown[])
-      .map(normalizeRoutingState)
-      .filter((value): value is string => Boolean(value));
-    const invalidCount = (raw.routing_states as unknown[]).length - normalized.length;
-    if (invalidCount > 0) {
-      errors.push("routing_states must contain only two-letter state abbreviations.");
-    }
-    routingStates = Array.from(new Set(normalized));
+  } else if (routingStatesResult.invalidCount > 0) {
+    errors.push("routing_states must contain only two-letter state abbreviations.");
   }
 
-  // accepted_case_types — array of valid strings (can be empty)
-  if (!Array.isArray(raw.accepted_case_types)) {
-    errors.push("accepted_case_types must be an array.");
-  } else {
-    const invalid = (raw.accepted_case_types as unknown[]).filter(
-      (v) => !VALID_CASE_TYPES.includes(v as typeof VALID_CASE_TYPES[number])
-    );
-    if (invalid.length > 0) {
-      errors.push(`accepted_case_types contains invalid values: ${invalid.join(", ")}.`);
-    }
+  if (raw.routing_excluded_states !== undefined && !Array.isArray(raw.routing_excluded_states)) {
+    errors.push("routing_excluded_states must be an array.");
+  } else if (excludedStatesResult.invalidCount > 0) {
+    errors.push("routing_excluded_states must contain only two-letter state abbreviations.");
   }
 
-  // accepted_languages — array of valid strings (can be empty)
-  if (!Array.isArray(raw.accepted_languages)) {
-    errors.push("accepted_languages must be an array.");
-  } else {
-    const invalid = (raw.accepted_languages as unknown[]).filter(
-      (v) => !VALID_LANGUAGES.includes(v as typeof VALID_LANGUAGES[number])
-    );
-    if (invalid.length > 0) {
-      errors.push(`accepted_languages contains invalid values: ${invalid.join(", ")}.`);
-    }
+  if (routingScope === "selected_states" && routingStatesResult.states.length === 0) {
+    errors.push("Select at least one accepted state, or choose United States coverage.");
   }
 
-  // Boolean flags
   for (const flag of [
     "accepts_initial_filings",
     "accepts_appeals",
@@ -133,7 +114,6 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
-  // lead_notes — optional string or null
   if (raw.lead_notes !== null && raw.lead_notes !== undefined && typeof raw.lead_notes !== "string") {
     errors.push("lead_notes must be a string or null.");
   }
@@ -145,14 +125,15 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  // ── Build update payload ─────────────────────────────────────────────────────
   const update = {
     accepting_leads:         raw.accepting_leads as boolean,
     lead_status:             raw.lead_status as LeadStatus,
     monthly_lead_capacity:   (raw.monthly_lead_capacity as string).trim(),
-    routing_states:          routingStates,
-    accepted_case_types:     raw.accepted_case_types as string[],
-    accepted_languages:      raw.accepted_languages as string[],
+    routing_scope:           routingScope,
+    routing_states:          routingScope === "selected_states" ? routingStatesResult.states : [],
+    routing_excluded_states: routingScope === "united_states" ? excludedStatesResult.states : [],
+    accepted_case_types:     DEFAULT_CASE_TYPES,
+    accepted_languages:      DEFAULT_LANGUAGES,
     accepts_initial_filings: raw.accepts_initial_filings as boolean,
     accepts_appeals:         raw.accepts_appeals as boolean,
     accepts_hearings:        raw.accepts_hearings as boolean,
@@ -162,16 +143,14 @@ export async function PATCH(request: NextRequest) {
                                : null,
   };
 
-  // ── Update partner_accounts ──────────────────────────────────────────────────
   const { data: updated, error: updateError } = await supabaseAdmin
     .from("partner_accounts")
     .update(update)
     .eq("id", partnerId)
     .select(
-      "id, accepting_leads, lead_status, monthly_lead_capacity, routing_states, " +
-      "accepted_case_types, accepted_languages, " +
-      "accepts_initial_filings, accepts_appeals, accepts_hearings, accepts_child_cases, " +
-      "lead_notes"
+      "id, accepting_leads, lead_status, monthly_lead_capacity, routing_scope, routing_states, routing_excluded_states, " +
+      "accepted_case_types, accepted_languages, accepts_initial_filings, accepts_appeals, " +
+      "accepts_hearings, accepts_child_cases, lead_notes"
     )
     .single();
 

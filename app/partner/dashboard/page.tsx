@@ -28,7 +28,9 @@ interface PartnerAccountDashboard {
   accepts_hearings: boolean | null;
   accepts_child_cases: boolean | null;
   lead_notes: string | null;
+  routing_scope: string | null;
   routing_states: string[] | null;
+  routing_excluded_states: string[] | null;
   billing_contact_name: string | null;
   billing_contact_email: string | null;
   billing_address_line1: string | null;
@@ -102,7 +104,7 @@ export default async function PartnerDashboardPage() {
     .select(
       "id, firm_name, contact_first_name, contact_last_name, email, phone, website, states_served, practice_area, " +
       "monthly_lead_capacity, status, accepting_leads, lead_status, accepted_case_types, accepted_languages, " +
-      "accepts_initial_filings, accepts_appeals, accepts_hearings, accepts_child_cases, lead_notes, routing_states, " +
+      "accepts_initial_filings, accepts_appeals, accepts_hearings, accepts_child_cases, lead_notes, routing_scope, routing_states, routing_excluded_states, " +
       "billing_contact_name, billing_contact_email, billing_address_line1"
     )
     .eq("id", session.partnerAccountId)
@@ -187,8 +189,8 @@ export default async function PartnerDashboardPage() {
   const routingChecks = [
     partner.accepting_leads === true,
     partner.lead_status === "active",
-    (partner.routing_states ?? []).length > 0,
-    (partner.accepted_case_types ?? []).length > 0,
+    partner.routing_scope === "united_states" || (partner.routing_states ?? []).length > 0,
+    true,
     partner.accepts_initial_filings || partner.accepts_appeals || partner.accepts_hearings || partner.accepts_child_cases,
     isPositiveNumberText(partner.monthly_lead_capacity),
   ];
@@ -242,12 +244,12 @@ export default async function PartnerDashboardPage() {
   const readinessNotes = [
     partner.accepting_leads === true ? "Accepting new leads" : "Not currently accepting leads",
     `Lead status: ${statusLabel(partner.lead_status)}`,
-    (partner.routing_states ?? []).length > 0
-      ? `Routing states: ${(partner.routing_states ?? []).join(", ")}`
-      : "Routing states not set",
-    (partner.accepted_case_types ?? []).length > 0
-      ? `Benefit programs: ${(partner.accepted_case_types ?? []).join(", ")}`
-      : "Benefit programs not set",
+    partner.routing_scope === "united_states"
+      ? `Routing coverage: United States${(partner.routing_excluded_states ?? []).length ? ` except ${(partner.routing_excluded_states ?? []).join(", ")}` : ""}`
+      : ((partner.routing_states ?? []).length > 0
+        ? `Routing states: ${(partner.routing_states ?? []).join(", ")}`
+        : "Routing states not set"),
+    "Program: Social Security Disability",
   ];
 
   return (

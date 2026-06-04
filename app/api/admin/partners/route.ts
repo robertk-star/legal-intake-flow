@@ -38,7 +38,9 @@ export async function GET(request: Request) {
       states_served,
       practice_area,
       monthly_lead_capacity,
+      routing_scope,
       routing_states,
+      routing_excluded_states,
       profile_updated_at,
       billing_contact_name,
       billing_contact_email,
@@ -52,6 +54,13 @@ export async function GET(request: Request) {
       status,
       accepting_leads,
       lead_status,
+      accepted_case_types,
+      accepted_languages,
+      accepts_initial_filings,
+      accepts_appeals,
+      accepts_hearings,
+      accepts_child_cases,
+      lead_notes,
       last_login_at,
       created_at
     `)

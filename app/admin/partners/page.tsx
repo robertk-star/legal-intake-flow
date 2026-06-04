@@ -21,7 +21,9 @@ interface PartnerAccount {
   states_served: string | null;
   practice_area: string | null;
   monthly_lead_capacity: string | null;
+  routing_scope?: string | null;
   routing_states?: string[] | null;
+  routing_excluded_states?: string[] | null;
   profile_updated_at?: string | null;
   billing_contact_name?: string | null;
   billing_contact_email?: string | null;
@@ -624,7 +626,7 @@ function PartnerDetailModal({
               <PrefRow label="Phone"            value={partner.phone} />
               <PrefRow label="Website"          value={partner.website} />
               <PrefRow label="States Served"    value={partner.states_served} />
-              <PrefRow label="Routing States"   value={(partner.routing_states ?? []).join(", ") || "—"} />
+              <PrefRow label="Routing Coverage" value={(partner.routing_scope === "united_states") ? `United States${partner.routing_excluded_states?.length ? ` except ${partner.routing_excluded_states.join(", ")}` : ""}` : ((partner.routing_states ?? []).join(", ") || "—")} />
               <PrefRow label="Practice Area"    value={partner.practice_area} />
               <PrefRow label="Monthly Capacity" value={partner.monthly_lead_capacity} />
               <PrefRow label="Last Login"       value={formatDateTime(partner.last_login_at)} />
@@ -721,13 +723,12 @@ function PartnerDetailModal({
             <div className="space-y-2">
               <PrefRow label="Accepting Leads"  value={partner.accepting_leads == null ? "—" : partner.accepting_leads ? "Yes" : "No"} />
               <PrefRow label="Lead Status"      value={partner.lead_status ?? "—"} />
-              <PrefRow label="Routing States"   value={(partner.routing_states ?? []).join(", ") || "—"} />
-              <PrefRow label="Benefit Programs" value={(partner.accepted_case_types ?? []).join(", ") || "—"} />
+              <PrefRow label="Routing Coverage" value={(partner.routing_scope === "united_states") ? `United States${partner.routing_excluded_states?.length ? ` except ${partner.routing_excluded_states.join(", ")}` : ""}` : ((partner.routing_states ?? []).join(", ") || "—")} />
+              <PrefRow label="Program"          value="Social Security Disability" />
               <PrefRow label="Initial Filings"  value={partner.accepts_initial_filings == null ? "—" : partner.accepts_initial_filings ? "Yes" : "No"} />
               <PrefRow label="Appeals"          value={partner.accepts_appeals == null ? "—" : partner.accepts_appeals ? "Yes" : "No"} />
               <PrefRow label="Hearings"         value={partner.accepts_hearings == null ? "—" : partner.accepts_hearings ? "Yes" : "No"} />
               <PrefRow label="Child Disability" value={partner.accepts_child_cases == null ? "—" : partner.accepts_child_cases ? "Yes" : "No"} />
-              <PrefRow label="Languages"        value={(partner.accepted_languages ?? []).join(", ") || "—"} />
               <PrefRow label="Lead Notes"       value={partner.lead_notes ?? "—"} />
             </div>
           </section>

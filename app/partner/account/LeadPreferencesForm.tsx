@@ -4,11 +4,15 @@ import { useState } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export type RoutingScope = "united_states" | "selected_states";
+
 export interface LeadPreferences {
   accepting_leads:         boolean;
   lead_status:             "active" | "paused" | "at_capacity";
   monthly_lead_capacity:   string;
+  routing_scope:           RoutingScope;
   routing_states:          string[];
+  routing_excluded_states: string[];
   accepted_case_types:     string[];
   accepted_languages:      string[];
   accepts_initial_filings: boolean;
@@ -20,32 +24,83 @@ export interface LeadPreferences {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-/** SSDI/SSI case-type tags stored in the accepted_case_types text[] column */
-const CASE_TYPE_OPTIONS = [
-  { value: "SSDI", label: "SSDI (Social Security Disability Insurance)" },
-  { value: "SSI",  label: "SSI (Supplemental Security Income)" },
-] as const;
-
-const LANGUAGE_OPTIONS = [
-  { value: "English", label: "English" },
-  { value: "Spanish", label: "Spanish" },
-] as const;
-
 const LEAD_STATUS_OPTIONS = [
   { value: "active",      label: "Active" },
   { value: "paused",      label: "Paused" },
   { value: "at_capacity", label: "At Capacity" },
 ] as const;
 
-function normalizeRoutingStates(value: string): string[] {
+const STATE_OPTIONS = [
+  { value: "AL", label: "Alabama" },
+  { value: "AK", label: "Alaska" },
+  { value: "AZ", label: "Arizona" },
+  { value: "AR", label: "Arkansas" },
+  { value: "CA", label: "California" },
+  { value: "CO", label: "Colorado" },
+  { value: "CT", label: "Connecticut" },
+  { value: "DE", label: "Delaware" },
+  { value: "DC", label: "District of Columbia" },
+  { value: "FL", label: "Florida" },
+  { value: "GA", label: "Georgia" },
+  { value: "HI", label: "Hawaii" },
+  { value: "ID", label: "Idaho" },
+  { value: "IL", label: "Illinois" },
+  { value: "IN", label: "Indiana" },
+  { value: "IA", label: "Iowa" },
+  { value: "KS", label: "Kansas" },
+  { value: "KY", label: "Kentucky" },
+  { value: "LA", label: "Louisiana" },
+  { value: "ME", label: "Maine" },
+  { value: "MD", label: "Maryland" },
+  { value: "MA", label: "Massachusetts" },
+  { value: "MI", label: "Michigan" },
+  { value: "MN", label: "Minnesota" },
+  { value: "MS", label: "Mississippi" },
+  { value: "MO", label: "Missouri" },
+  { value: "MT", label: "Montana" },
+  { value: "NE", label: "Nebraska" },
+  { value: "NV", label: "Nevada" },
+  { value: "NH", label: "New Hampshire" },
+  { value: "NJ", label: "New Jersey" },
+  { value: "NM", label: "New Mexico" },
+  { value: "NY", label: "New York" },
+  { value: "NC", label: "North Carolina" },
+  { value: "ND", label: "North Dakota" },
+  { value: "OH", label: "Ohio" },
+  { value: "OK", label: "Oklahoma" },
+  { value: "OR", label: "Oregon" },
+  { value: "PA", label: "Pennsylvania" },
+  { value: "RI", label: "Rhode Island" },
+  { value: "SC", label: "South Carolina" },
+  { value: "SD", label: "South Dakota" },
+  { value: "TN", label: "Tennessee" },
+  { value: "TX", label: "Texas" },
+  { value: "UT", label: "Utah" },
+  { value: "VT", label: "Vermont" },
+  { value: "VA", label: "Virginia" },
+  { value: "WA", label: "Washington" },
+  { value: "WV", label: "West Virginia" },
+  { value: "WI", label: "Wisconsin" },
+  { value: "WY", label: "Wyoming" },
+] as const;
+
+const LEAD_PROGRAMS = ["SSDI", "SSI"];
+const LEAD_LANGUAGES = ["English"];
+
+function normalizeStateArray(values: string[] | null | undefined): string[] {
+  const allowed = new Set(STATE_OPTIONS.map((state) => state.value));
   return Array.from(
-    new Set(
-      value
-        .split(/[,;\n|/]+/)
-        .map((item) => item.trim().toUpperCase())
-        .filter(Boolean)
-    )
+    new Set((values ?? []).map((value) => value.trim().toUpperCase()).filter((value) => allowed.has(value)))
   );
+}
+
+function stateLabel(value: string) {
+  const match = STATE_OPTIONS.find((state) => state.value === value);
+  return match ? `${match.value} — ${match.label}` : value;
+}
+
+function selectedValuesFromSelect(select: HTMLSelectElement) {
+  return Array.from(select.selectedOptions).map((option) => option.value);
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -55,44 +110,27 @@ export default function LeadPreferencesForm({
 }: {
   initialPreferences: LeadPreferences;
 }) {
+  const initialScope: RoutingScope =
+    initialPreferences.routing_scope === "united_states" ? "united_states" : "selected_states";
+
   const [prefs, setPrefs] = useState<LeadPreferences>({
     ...initialPreferences,
-    routing_states:      initialPreferences.routing_states      ?? [],
-    accepted_case_types: initialPreferences.accepted_case_types ?? [],
-    accepted_languages:  initialPreferences.accepted_languages  ?? [],
-    lead_notes:          initialPreferences.lead_notes          ?? "",
+    routing_scope:           initialScope,
+    routing_states:          normalizeStateArray(initialPreferences.routing_states),
+    routing_excluded_states: normalizeStateArray(initialPreferences.routing_excluded_states),
+    accepted_case_types:     LEAD_PROGRAMS,
+    accepted_languages:      LEAD_LANGUAGES,
+    lead_notes:              initialPreferences.lead_notes ?? "",
   });
-
-  const [routingStatesText, setRoutingStatesText] = useState(
-    (initialPreferences.routing_states ?? []).join(", ")
-  );
 
   const [saving,  setSaving]  = useState(false);
   const [success, setSuccess] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  function toggleArrayValue(
-    key: "accepted_case_types" | "accepted_languages",
-    value: string
-  ) {
-    setPrefs((prev) => {
-      const current = prev[key] ?? [];
-      const next = current.includes(value)
-        ? current.filter((v) => v !== value)
-        : [...current, value];
-      return { ...prev, [key]: next };
-    });
-    setSuccess(false);
-  }
-
   function setField<K extends keyof LeadPreferences>(key: K, value: LeadPreferences[K]) {
     setPrefs((prev) => ({ ...prev, [key]: value }));
     setSuccess(false);
   }
-
-  // ── Save ───────────────────────────────────────────────────────────────────
 
   async function handleSave() {
     setSaving(true);
@@ -100,12 +138,18 @@ export default function LeadPreferencesForm({
     setError(null);
 
     try {
+      const routingStates = prefs.routing_scope === "selected_states" ? normalizeStateArray(prefs.routing_states) : [];
+      const routingExcludedStates = prefs.routing_scope === "united_states" ? normalizeStateArray(prefs.routing_excluded_states) : [];
+
       const res = await fetch("/api/partner/preferences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...prefs,
-          routing_states: normalizeRoutingStates(routingStatesText),
+          routing_states: routingStates,
+          routing_excluded_states: routingExcludedStates,
+          accepted_case_types: LEAD_PROGRAMS,
+          accepted_languages: LEAD_LANGUAGES,
           lead_notes: prefs.lead_notes?.trim() || null,
         }),
       });
@@ -131,32 +175,29 @@ export default function LeadPreferencesForm({
     }
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const selectedRoutingStates = normalizeStateArray(prefs.routing_states);
+  const selectedExcludedStates = normalizeStateArray(prefs.routing_excluded_states);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      {/* Card header */}
       <div className="border-b border-gray-100 px-6 py-4">
         <h2 className="text-base font-semibold text-[#0d1b2e]">Lead Preferences</h2>
         <p className="mt-0.5 text-xs text-gray-500">
-          Configure the types of leads you want to receive. These settings will be used when lead routing goes live.
+          Configure where and when your firm accepts Social Security Disability leads.
         </p>
       </div>
 
       <div className="space-y-8 px-6 py-6">
-
-        {/* ── Lead Status ─────────────────────────────────────────────────── */}
         <fieldset>
-          <legend className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4">
+          <legend className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
             Lead Status
           </legend>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-            {/* Accepting New Leads toggle */}
-            <div className="sm:col-span-3 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+            <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 sm:col-span-3">
               <div>
                 <p className="text-sm font-medium text-gray-800">Accepting New Leads</p>
-                <p className="text-xs text-gray-500 mt-0.5">Turn off to pause all new lead delivery.</p>
+                <p className="mt-0.5 text-xs text-gray-500">Turn off to pause all new lead delivery.</p>
               </div>
               <button
                 type="button"
@@ -175,9 +216,8 @@ export default function LeadPreferencesForm({
               </button>
             </div>
 
-            {/* Lead Status dropdown */}
             <div className="sm:col-span-2">
-              <label htmlFor="lead_status" className="block text-xs font-medium text-gray-600 mb-1.5">
+              <label htmlFor="lead_status" className="mb-1.5 block text-xs font-medium text-gray-600">
                 Lead Status
               </label>
               <select
@@ -192,9 +232,8 @@ export default function LeadPreferencesForm({
               </select>
             </div>
 
-            {/* Monthly Lead Capacity */}
             <div>
-              <label htmlFor="monthly_lead_capacity" className="block text-xs font-medium text-gray-600 mb-1.5">
+              <label htmlFor="monthly_lead_capacity" className="mb-1.5 block text-xs font-medium text-gray-600">
                 Monthly Lead Capacity
               </label>
               <input
@@ -209,58 +248,97 @@ export default function LeadPreferencesForm({
           </div>
         </fieldset>
 
-        {/* ── Routing States ───────────────────────────────────────────────── */}
         <fieldset>
-          <legend className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
+          <legend className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
             States Accepted for Routing
           </legend>
-          <p className="text-xs text-gray-500 mb-3">
-            Enter two-letter state abbreviations separated by commas. These are used for admin routing previews before automatic routing is built.
+          <p className="mb-4 text-xs text-gray-500">
+            Choose all United States coverage with optional exclusions, or select only the states your firm accepts.
           </p>
-          <input
-            type="text"
-            value={routingStatesText}
-            onChange={(e) => {
-              setRoutingStatesText(e.target.value);
-              setSuccess(false);
-            }}
-            placeholder="e.g. TX, FL, GA"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-800 shadow-sm placeholder:text-gray-400 focus:border-[#1a3a8f] focus:outline-none focus:ring-1 focus:ring-[#1a3a8f]"
-          />
-          <p className="mt-1.5 text-xs text-gray-500">
-            Current routing states: {normalizeRoutingStates(routingStatesText).join(", ") || "None configured"}
-          </p>
-        </fieldset>
 
-        {/* ── Case Types (SSDI / SSI) ──────────────────────────────────────── */}
-        <fieldset>
-          <legend className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
-            Benefit Programs Accepted
-          </legend>
-          <p className="text-xs text-gray-500 mb-4">Select the Social Security programs you accept cases for.</p>
-          <div className="space-y-2.5">
-            {CASE_TYPE_OPTIONS.map((opt) => (
-              <label key={opt.value} className="flex items-center gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={(prefs.accepted_case_types ?? []).includes(opt.value)}
-                  onChange={() => toggleArrayValue("accepted_case_types", opt.value)}
-                  className="h-4 w-4 rounded border-gray-300 text-[#1a3a8f] focus:ring-[#1a3a8f]"
-                />
-                <span className="text-sm text-gray-700 group-hover:text-gray-900">{opt.label}</span>
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <div>
+              <label htmlFor="routing_scope" className="mb-1.5 block text-xs font-medium text-gray-600">
+                Coverage Type
               </label>
-            ))}
+              <select
+                id="routing_scope"
+                value={prefs.routing_scope}
+                onChange={(e) => {
+                  const nextScope = e.target.value as RoutingScope;
+                  setPrefs((prev) => ({
+                    ...prev,
+                    routing_scope: nextScope,
+                    routing_states: nextScope === "united_states" ? [] : prev.routing_states,
+                    routing_excluded_states: nextScope === "selected_states" ? [] : prev.routing_excluded_states,
+                  }));
+                  setSuccess(false);
+                }}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:border-[#1a3a8f] focus:outline-none focus:ring-1 focus:ring-[#1a3a8f]"
+              >
+                <option value="united_states">United States</option>
+                <option value="selected_states">Only selected states</option>
+              </select>
+              <p className="mt-1.5 text-xs text-gray-500">
+                {prefs.routing_scope === "united_states"
+                  ? "Your firm accepts leads nationwide except the excluded states listed to the right."
+                  : "Your firm accepts leads only from the states selected to the right."}
+              </p>
+            </div>
+
+            {prefs.routing_scope === "selected_states" ? (
+              <div>
+                <label htmlFor="routing_states" className="mb-1.5 block text-xs font-medium text-gray-600">
+                  Select Accepted States
+                </label>
+                <select
+                  id="routing_states"
+                  multiple
+                  size={9}
+                  value={selectedRoutingStates}
+                  onChange={(e) => setField("routing_states", selectedValuesFromSelect(e.currentTarget))}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:border-[#1a3a8f] focus:outline-none focus:ring-1 focus:ring-[#1a3a8f]"
+                >
+                  {STATE_OPTIONS.map((state) => (
+                    <option key={state.value} value={state.value}>{stateLabel(state.value)}</option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-gray-500">
+                  Selected states: {selectedRoutingStates.join(", ") || "None selected"}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="routing_excluded_states" className="mb-1.5 block text-xs font-medium text-gray-600">
+                  Excluded States
+                </label>
+                <select
+                  id="routing_excluded_states"
+                  multiple
+                  size={9}
+                  value={selectedExcludedStates}
+                  onChange={(e) => setField("routing_excluded_states", selectedValuesFromSelect(e.currentTarget))}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:border-[#1a3a8f] focus:outline-none focus:ring-1 focus:ring-[#1a3a8f]"
+                >
+                  {STATE_OPTIONS.map((state) => (
+                    <option key={state.value} value={state.value}>{stateLabel(state.value)}</option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-gray-500">
+                  Excluded states: {selectedExcludedStates.join(", ") || "None"}
+                </p>
+              </div>
+            )}
           </div>
         </fieldset>
 
-        {/* ── Case Stage Preferences (boolean columns) ─────────────────────── */}
         <fieldset>
-          <legend className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
+          <legend className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
             Case Stages Accepted
           </legend>
-          <p className="text-xs text-gray-500 mb-4">Select the stages of the disability process you handle.</p>
+          <p className="mb-4 text-xs text-gray-500">Select the stages of the Social Security Disability process you handle.</p>
           <div className="space-y-2.5">
-            <label className="flex items-center gap-3 cursor-pointer group">
+            <label className="flex cursor-pointer items-center gap-3 group">
               <input
                 type="checkbox"
                 checked={prefs.accepts_initial_filings}
@@ -270,7 +348,7 @@ export default function LeadPreferencesForm({
               <span className="text-sm text-gray-700 group-hover:text-gray-900">Initial Filings</span>
             </label>
 
-            <label className="flex items-center gap-3 cursor-pointer group">
+            <label className="flex cursor-pointer items-center gap-3 group">
               <input
                 type="checkbox"
                 checked={prefs.accepts_appeals}
@@ -280,7 +358,7 @@ export default function LeadPreferencesForm({
               <span className="text-sm text-gray-700 group-hover:text-gray-900">Appeals / Denials</span>
             </label>
 
-            <label className="flex items-center gap-3 cursor-pointer group">
+            <label className="flex cursor-pointer items-center gap-3 group">
               <input
                 type="checkbox"
                 checked={prefs.accepts_hearings}
@@ -290,7 +368,7 @@ export default function LeadPreferencesForm({
               <span className="text-sm text-gray-700 group-hover:text-gray-900">Hearings</span>
             </label>
 
-            <label className="flex items-center gap-3 cursor-pointer group">
+            <label className="flex cursor-pointer items-center gap-3 group">
               <input
                 type="checkbox"
                 checked={prefs.accepts_child_cases}
@@ -302,29 +380,8 @@ export default function LeadPreferencesForm({
           </div>
         </fieldset>
 
-        {/* ── Languages ───────────────────────────────────────────────────── */}
-        <fieldset>
-          <legend className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4">
-            Languages
-          </legend>
-          <div className="space-y-2.5">
-            {LANGUAGE_OPTIONS.map((opt) => (
-              <label key={opt.value} className="flex items-center gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={(prefs.accepted_languages ?? []).includes(opt.value)}
-                  onChange={() => toggleArrayValue("accepted_languages", opt.value)}
-                  className="h-4 w-4 rounded border-gray-300 text-[#1a3a8f] focus:ring-[#1a3a8f]"
-                />
-                <span className="text-sm text-gray-700 group-hover:text-gray-900">{opt.label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        {/* ── Lead Notes ──────────────────────────────────────────────────── */}
         <div>
-          <label htmlFor="lead_notes" className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4">
+          <label htmlFor="lead_notes" className="mb-4 block text-xs font-semibold uppercase tracking-wider text-gray-400">
             Lead Notes
           </label>
           <textarea
@@ -332,36 +389,27 @@ export default function LeadPreferencesForm({
             rows={4}
             value={prefs.lead_notes ?? ""}
             onChange={(e) => setField("lead_notes", e.target.value)}
-            placeholder="e.g. Only accepting Texas claimants. Appeals preferred. Spanish-speaking intake preferred."
+            placeholder="e.g. Appeals preferred. Only send leads with complete phone numbers."
             className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-800 shadow-sm placeholder:text-gray-400 focus:border-[#1a3a8f] focus:outline-none focus:ring-1 focus:ring-[#1a3a8f]"
           />
           <p className="mt-1.5 text-xs text-gray-500">
-            Internal use only. Used for routing preferences when lead delivery goes live.
+            Internal use only. Used for routing preferences and admin review.
           </p>
         </div>
 
-        {/* ── Save button + feedback ───────────────────────────────────────── */}
         <div className="flex flex-col gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:items-center">
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="rounded-md bg-[#1a3a8f] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#162e75] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-md bg-[#1a3a8f] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#162e75] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save Preferences"}
           </button>
 
-          {success && (
-            <p className="text-sm font-medium text-green-700">
-              Preferences saved successfully.
-            </p>
-          )}
-
-          {error && (
-            <p className="text-sm text-red-600">{error}</p>
-          )}
+          {success && <p className="text-sm font-medium text-green-700">Preferences saved successfully.</p>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
-
       </div>
     </div>
   );

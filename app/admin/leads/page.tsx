@@ -77,7 +77,9 @@ interface EligibilityRow {
     status: string | null;
     accepting_leads: boolean | null;
     lead_status: string | null;
+    routing_scope: string | null;
     routing_states: string[];
+    routing_excluded_states: string[];
     accepted_case_types: string[];
     monthly_lead_capacity: string | null;
     monthly_assigned_count: number;
@@ -727,7 +729,7 @@ function LeadDetailModal({
                               </span>
                             </div>
                             <p className="mt-1 text-xs text-gray-500">
-                              States: {item.partner.routing_states.join(", ") || "—"} · Programs: {item.partner.accepted_case_types.join(", ") || "—"} · Capacity: {item.partner.monthly_assigned_count}/{item.partner.monthly_lead_capacity || "—"}
+                              Coverage: {item.partner.routing_scope === "united_states" ? `United States${item.partner.routing_excluded_states.length ? ` except ${item.partner.routing_excluded_states.join(", ")}` : ""}` : (item.partner.routing_states.join(", ") || "—")} · Program: Social Security Disability · Capacity: {item.partner.monthly_assigned_count}/{item.partner.monthly_lead_capacity || "—"}
                             </p>
                           </div>
                           <button

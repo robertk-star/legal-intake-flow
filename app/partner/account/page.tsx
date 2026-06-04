@@ -20,7 +20,9 @@ interface PartnerAccount {
   states_served: string;
   practice_area: string;
   monthly_lead_capacity: string;
+  routing_scope: string | null;
   routing_states: string[] | null;
+  routing_excluded_states: string[] | null;
   status: string;
   last_login_at: string | null;
   created_at: string;
@@ -86,7 +88,7 @@ export default async function PartnerAccountPage() {
     .from("partner_accounts")
     .select(
       "id, firm_name, contact_first_name, contact_last_name, email, phone, website, " +
-      "states_served, practice_area, monthly_lead_capacity, routing_states, status, last_login_at, created_at, " +
+      "states_served, practice_area, monthly_lead_capacity, routing_scope, routing_states, routing_excluded_states, status, last_login_at, created_at, " +
       "profile_updated_at, billing_contact_name, billing_contact_email, billing_contact_phone, " +
       "billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_notes, " +
       "accepting_leads, lead_status, accepted_case_types, accepted_languages, " +
@@ -115,7 +117,9 @@ export default async function PartnerAccountPage() {
     accepting_leads:         partner.accepting_leads         ?? true,
     lead_status:             (partner.lead_status as LeadPreferences["lead_status"]) ?? "active",
     monthly_lead_capacity:   partner.monthly_lead_capacity   ?? "",
+    routing_scope:           (partner.routing_scope as LeadPreferences["routing_scope"]) ?? "selected_states",
     routing_states:          partner.routing_states          ?? [],
+    routing_excluded_states: partner.routing_excluded_states ?? [],
     accepted_case_types:     partner.accepted_case_types     ?? [],
     accepted_languages:      partner.accepted_languages      ?? [],
     accepts_initial_filings: partner.accepts_initial_filings ?? true,
