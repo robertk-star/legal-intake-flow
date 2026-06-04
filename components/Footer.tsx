@@ -6,6 +6,7 @@ const FOOTER_LINKS = [
   { href: "/for-attorneys", label: "For Attorneys" },
   { href: "/example-reports", label: "Example Reports" },
   { href: "/request-access", label: "Request Access" },
+  { href: "/admin/login", label: "Admin" },
   { href: "/privacy", label: "Privacy Policy" },
   { href: "/terms", label: "Terms of Use" },
 ];
@@ -45,7 +46,11 @@ export function Footer() {
               <Link
                 key={href}
                 href={href}
-                className="text-sm text-gray-400 transition-colors hover:text-white"
+                className={
+                  label === "Admin"
+                    ? "inline-flex rounded-md border border-gray-600 px-3 py-1.5 text-sm font-semibold text-gray-200 transition-colors hover:border-white hover:text-white"
+                    : "text-sm text-gray-400 transition-colors hover:text-white"
+                }
               >
                 {label}
               </Link>

@@ -45,6 +45,12 @@ export function Header() {
             </Link>
           ))}
           <Link
+            href="/partner/login"
+            className="rounded-md border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          >
+            Login
+          </Link>
+          <Link
             href="/request-access"
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           >
@@ -88,8 +94,15 @@ export function Header() {
               </Link>
             ))}
             <Link
+              href="/partner/login"
+              className="mt-1 rounded-md border border-blue-200 px-4 py-2 text-center text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50"
+              onClick={() => setMobileOpen(false)}
+            >
+              Login
+            </Link>
+            <Link
               href="/request-access"
-              className="mt-1 rounded-md bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              className="rounded-md bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700"
               onClick={() => setMobileOpen(false)}
             >
               Request Access

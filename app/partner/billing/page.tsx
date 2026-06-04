@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -69,6 +70,14 @@ export default async function PartnerBillingPage() {
       <header className="border-b border-gray-200 bg-[#0d1b2e]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-6">
+            <Image
+              src="/images/lif-name-logo.png"
+              alt="Legal Intake Flow"
+              width={180}
+              height={36}
+              className="h-8 w-auto object-contain brightness-0 invert"
+              priority
+            />
             <nav className="hidden items-center gap-4 text-sm sm:flex">
               <Link href="/partner/dashboard" className="text-white/70 hover:text-white">
                 Dashboard
