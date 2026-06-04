@@ -88,7 +88,7 @@ const LEAD_PROGRAMS = ["SSDI", "SSI"];
 const LEAD_LANGUAGES = ["English"];
 
 function normalizeStateArray(values: string[] | null | undefined): string[] {
-  const allowed = new Set(STATE_OPTIONS.map((state) => state.value));
+  const allowed = new Set<string>(STATE_OPTIONS.map((state) => state.value));
   return Array.from(
     new Set((values ?? []).map((value) => value.trim().toUpperCase()).filter((value) => allowed.has(value)))
   );
