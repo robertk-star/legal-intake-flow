@@ -94,13 +94,64 @@ function normalizeStateArray(values: string[] | null | undefined): string[] {
   );
 }
 
-function stateLabel(value: string) {
-  const match = STATE_OPTIONS.find((state) => state.value === value);
-  return match ? `${match.value} — ${match.label}` : value;
+function toggleStateValue(current: string[], value: string) {
+  const normalized = normalizeStateArray(current);
+  return normalized.includes(value)
+    ? normalized.filter((state) => state !== value)
+    : [...normalized, value].sort();
 }
 
-function selectedValuesFromSelect(select: HTMLSelectElement) {
-  return Array.from(select.selectedOptions).map((option) => option.value);
+function StateCheckboxGroup({
+  label,
+  values,
+  onChange,
+  emptyLabel,
+}: {
+  label: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+  emptyLabel: string;
+}) {
+  const normalized = normalizeStateArray(values);
+
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <p className="text-xs font-medium text-gray-600">{label}</p>
+        {normalized.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className="text-xs font-semibold text-[#1a3a8f] hover:underline"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      <div className="max-h-64 overflow-y-auto rounded-md border border-gray-300 bg-white p-3 shadow-sm">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {STATE_OPTIONS.map((state) => (
+            <label key={state.value} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={normalized.includes(state.value)}
+                onChange={() => onChange(toggleStateValue(normalized, state.value))}
+                className="h-4 w-4 rounded border-gray-300 text-[#1a3a8f] focus:ring-[#1a3a8f]"
+              />
+              <span className="text-sm text-gray-700">
+                {state.value} — {state.label}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-1.5 text-xs text-gray-500">
+        {normalized.length > 0 ? `${normalized.length} selected: ${normalized.join(", ")}` : emptyLabel}
+      </p>
+    </div>
+  );
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -287,47 +338,19 @@ export default function LeadPreferencesForm({
             </div>
 
             {prefs.routing_scope === "selected_states" ? (
-              <div>
-                <label htmlFor="routing_states" className="mb-1.5 block text-xs font-medium text-gray-600">
-                  Select Accepted States
-                </label>
-                <select
-                  id="routing_states"
-                  multiple
-                  size={9}
-                  value={selectedRoutingStates}
-                  onChange={(e) => setField("routing_states", selectedValuesFromSelect(e.currentTarget))}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:border-[#1a3a8f] focus:outline-none focus:ring-1 focus:ring-[#1a3a8f]"
-                >
-                  {STATE_OPTIONS.map((state) => (
-                    <option key={state.value} value={state.value}>{stateLabel(state.value)}</option>
-                  ))}
-                </select>
-                <p className="mt-1.5 text-xs text-gray-500">
-                  Selected states: {selectedRoutingStates.join(", ") || "None selected"}
-                </p>
-              </div>
+              <StateCheckboxGroup
+                label="Select Accepted States"
+                values={selectedRoutingStates}
+                onChange={(values) => setField("routing_states", values)}
+                emptyLabel="No states selected yet."
+              />
             ) : (
-              <div>
-                <label htmlFor="routing_excluded_states" className="mb-1.5 block text-xs font-medium text-gray-600">
-                  Excluded States
-                </label>
-                <select
-                  id="routing_excluded_states"
-                  multiple
-                  size={9}
-                  value={selectedExcludedStates}
-                  onChange={(e) => setField("routing_excluded_states", selectedValuesFromSelect(e.currentTarget))}
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:border-[#1a3a8f] focus:outline-none focus:ring-1 focus:ring-[#1a3a8f]"
-                >
-                  {STATE_OPTIONS.map((state) => (
-                    <option key={state.value} value={state.value}>{stateLabel(state.value)}</option>
-                  ))}
-                </select>
-                <p className="mt-1.5 text-xs text-gray-500">
-                  Excluded states: {selectedExcludedStates.join(", ") || "None"}
-                </p>
-              </div>
+              <StateCheckboxGroup
+                label="Excluded States"
+                values={selectedExcludedStates}
+                onChange={(values) => setField("routing_excluded_states", values)}
+                emptyLabel="No states excluded."
+              />
             )}
           </div>
         </fieldset>
