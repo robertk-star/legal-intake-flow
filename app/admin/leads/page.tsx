@@ -234,6 +234,7 @@ function LeadDetailModal({
   const [saveError, setSaveError]         = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess]     = useState(false);
   const [assigningBest, setAssigningBest] = useState(false);
+  const [assigningPartnerId, setAssigningPartnerId] = useState<string | null>(null);
   const [bestMatchError, setBestMatchError] = useState<string | null>(null);
   const [bestMatchSuccess, setBestMatchSuccess] = useState<string | null>(null);
   const [sendingNotification, setSendingNotification] = useState(false);
@@ -362,6 +363,45 @@ function LeadDetailModal({
       setBestMatchError("Network error. Please try again.");
     } finally {
       setAssigningBest(false);
+    }
+  }
+
+  async function handleAssignSpecificPartner(partnerId: string, partnerName: string, score?: number) {
+    if (!lead) return;
+    setAssigningPartnerId(partnerId);
+    setBestMatchError(null);
+    setBestMatchSuccess(null);
+
+    try {
+      const res = await fetch(`/api/admin/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "assigned",
+          assigned_partner_account_id: partnerId,
+          internal_review_notes: reviewNotes,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setBestMatchError(data.error ?? `Failed to assign ${partnerName}.`);
+        return;
+      }
+
+      const updated = { id: lead.id, ...data.data } as Partial<LeadDetail> & { id: string };
+      const scoreText = typeof score === "number" ? ` (score ${score})` : "";
+
+      setLead((prev) => prev ? { ...prev, ...updated } : prev);
+      setAssignedId(partnerId);
+      setStatus("assigned");
+      onUpdated(updated);
+      setBestMatchSuccess(`Assigned to ${partnerName}${scoreText}.`);
+      setTimeout(() => setBestMatchSuccess(null), 5000);
+    } catch {
+      setBestMatchError("Network error. Please try again.");
+    } finally {
+      setAssigningPartnerId(null);
     }
   }
 
@@ -659,7 +699,7 @@ function LeadDetailModal({
                   <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-blue-900">Routing Eligibility Preview</h3>
                     <p className="mt-1 text-xs text-blue-700">
-                      Admin-triggered assignment only. Review the recommendation, then click Assign Best Match or select a partner manually.
+                      Admin-triggered assignment only. Click Assign Best Match or assign a specific partner from the recommendation list.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -734,11 +774,11 @@ function LeadDetailModal({
                           </div>
                           <button
                             type="button"
-                            onClick={() => setAssignedId(item.partner.id)}
-                            disabled={isDbsLeadMissingConsent}
+                            onClick={() => handleAssignSpecificPartner(item.partner.id, item.partner.firm_name, item.score)}
+                            disabled={isDbsLeadMissingConsent || assigningPartnerId !== null}
                             className="shrink-0 rounded border border-[#1a3a5c] px-2 py-1 text-xs font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            Select
+                            {assigningPartnerId === item.partner.id ? "Assigning…" : "Assign"}
                           </button>
                         </div>
 
