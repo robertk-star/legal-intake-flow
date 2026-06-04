@@ -79,9 +79,11 @@ function StatusBadge({ status }: { status: Status }) {
 function PartnerAccountPanel({
   request,
   currentStatus,
+  savedStatus,
 }: {
   request: PartnerRequest;
   currentStatus: Status;
+  savedStatus: Status;
 }) {
   const [account, setAccount] = useState<PartnerAccount | null>(null);
   const [loadingAccount, setLoadingAccount] = useState(true);
@@ -206,7 +208,9 @@ function PartnerAccountPanel({
     }
   }
 
-  const isApproved = currentStatus === "approved";
+  const isSavedApproved = savedStatus === "approved";
+  const hasUnsavedStatusChange = currentStatus !== savedStatus;
+  const selectedApprovedButNotSaved = currentStatus === "approved" && !isSavedApproved;
 
   return (
     <section className="border-t border-gray-100 pt-4 space-y-4">
@@ -227,18 +231,32 @@ function PartnerAccountPanel({
       {/* No account yet */}
       {!loadingAccount && !account && (
         <div className="space-y-3">
-          {/* Block message if not approved */}
-          {!isApproved && (
+          {/* Block message if approved has been selected but not saved */}
+          {selectedApprovedButNotSaved && (
+            <div className="rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+              <strong>Save the approved status first.</strong> You selected Approved, but the saved database status is still
+              <span className="font-semibold capitalize"> {savedStatus}</span>. Click <strong>Save Changes</strong>, then create the partner account.
+            </div>
+          )}
+
+          {/* Block message if saved status is not approved */}
+          {!isSavedApproved && !selectedApprovedButNotSaved && (
             <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              <strong>Status must be set to &ldquo;Approved&rdquo;</strong> before a partner account can be created.
-              Current status: <span className="font-semibold capitalize">{currentStatus}</span>.
+              <strong>Saved status must be &ldquo;Approved&rdquo;</strong> before a partner account can be created.
+              Saved status: <span className="font-semibold capitalize">{savedStatus}</span>.
+            </div>
+          )}
+
+          {hasUnsavedStatusChange && isSavedApproved && currentStatus !== "approved" && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              You changed the status from Approved but have not saved that change. Creating a partner account still uses the saved approved status.
             </div>
           )}
 
           <button
             onClick={handleCreateAccount}
-            disabled={creating || !isApproved}
-            title={!isApproved ? "Set request status to Approved before creating a partner account." : undefined}
+            disabled={creating || !isSavedApproved}
+            title={!isSavedApproved ? "Save the request status as Approved before creating a partner account." : undefined}
             className="rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {creating ? "Creating Account…" : "Create Partner Account"}
@@ -394,6 +412,7 @@ function DetailModal({
   onUpdated: (updated: PartnerRequest) => void;
 }) {
   const [status, setStatus] = useState<Status>(request.status);
+  const [savedStatus, setSavedStatus] = useState<Status>(request.status);
   const [notes, setNotes] = useState(request.internal_notes ?? "");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -419,6 +438,8 @@ function DetailModal({
 
       if (data.success && data.data) {
         setSaveSuccess(true);
+        setSavedStatus(data.data.status);
+        setStatus(data.data.status);
         onUpdated(data.data);
         setTimeout(() => setSaveSuccess(false), 2000);
       } else {
@@ -548,8 +569,8 @@ function DetailModal({
             <p className="text-sm text-red-600">{saveError}</p>
           )}
 
-          {/* Partner Account Panel — passes live status so the Create button reflects unsaved changes */}
-          <PartnerAccountPanel request={request} currentStatus={status} />
+          {/* Partner Account Panel — creation is based on the saved database status, not unsaved status selections. */}
+          <PartnerAccountPanel request={request} currentStatus={status} savedStatus={savedStatus} />
         </div>
 
         {/* Footer */}
