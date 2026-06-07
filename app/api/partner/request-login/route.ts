@@ -22,6 +22,39 @@ type PartnerAccountLookup = {
   status: string;
 };
 
+async function logLoginCodeAttempt(input: {
+  email: string;
+  status: "skipped" | "failed";
+  reason: string;
+  partnerAccountId?: string | null;
+  partnerUserId?: string | null;
+  loginRequestId?: string | null;
+}) {
+  const { error } = await supabaseAdmin
+    .from("email_notifications")
+    .insert({
+      notification_type: "partner_login_link",
+      recipient_email: input.email.toLowerCase(),
+      recipient_name: null,
+      subject: "Partner login code request",
+      status: input.status,
+      provider: "resend",
+      partner_account_id: input.partnerAccountId ?? null,
+      partner_user_id: input.partnerUserId ?? null,
+      login_request_id: input.loginRequestId ?? null,
+      error_message: input.reason,
+      metadata: {
+        login_method: "email_code",
+        attempt_visibility: "admin_only",
+        reason: input.reason,
+      },
+    });
+
+  if (error) {
+    console.error("[request-login] Failed to log login-code attempt:", error);
+  }
+}
+
 /**
  * POST /api/partner/request-login
  *
@@ -110,7 +143,26 @@ export async function POST(request: Request) {
   const loginRequestId = (loginRequest?.id as string | undefined) ?? null;
 
   const accountIsAllowed = resolvedAccount?.status === "active" || resolvedAccount?.status === "pending";
-  if (resolvedUser && resolvedAccount && accountIsAllowed) {
+
+  if (!resolvedUser) {
+    await logLoginCodeAttempt({
+      email,
+      status: "skipped",
+      reason: "No active or pending partner user matched this email address.",
+      partnerAccountId: resolvedAccountId,
+      partnerUserId: resolvedUserId,
+      loginRequestId,
+    });
+  } else if (!resolvedAccount || !accountIsAllowed) {
+    await logLoginCodeAttempt({
+      email,
+      status: "skipped",
+      reason: "Partner user matched, but the partner account is not active or pending.",
+      partnerAccountId: resolvedAccountId,
+      partnerUserId: resolvedUserId,
+      loginRequestId,
+    });
+  } else {
     const codeResult = await createPartnerLoginCode({
       partnerAccountId: resolvedAccount.id,
       partnerUserId: resolvedUser.id,
@@ -120,7 +172,16 @@ export async function POST(request: Request) {
       userAgent,
     });
 
-    if (codeResult.code && codeResult.expiresAt) {
+    if (!codeResult.code || !codeResult.expiresAt) {
+      await logLoginCodeAttempt({
+        email: resolvedUser.email,
+        status: "failed",
+        reason: codeResult.error ?? "Failed to create partner login code. Confirm section30_partner_login_email_codes.sql has been run.",
+        partnerAccountId: resolvedAccount.id,
+        partnerUserId: resolvedUser.id,
+        loginRequestId,
+      });
+    } else {
       const recipientName = `${resolvedUser.first_name} ${resolvedUser.last_name}`.trim() || null;
       const emailResult = await sendPartnerLoginCodeEmail({
         partnerAccountId: resolvedAccount.id,
