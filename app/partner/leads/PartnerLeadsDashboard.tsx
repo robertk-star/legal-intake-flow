@@ -125,6 +125,90 @@ function DetailField({ label, value }: { label: string; value: string | null | u
   );
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function textToListItems(value: string | null | undefined) {
+  if (!value || !value.trim()) return [];
+
+  const labelBreaks = [
+    "Additional conditions",
+    "Condition changes",
+    "Current work status",
+    "Medical condition",
+    "Duration of condition",
+    "Application status",
+    "Impact on daily work",
+    "Ability to lift / carry",
+    "Ability to sit / stand",
+    "Sitting limit",
+    "Standing limit",
+    "Walking limit",
+    "Lifting limit",
+    "Has treating doctor",
+    "Specialist care",
+    "Hospital / ER visits",
+    "Prescribed medication",
+    "Medication side effects",
+    "Assistive devices",
+    "Medical records",
+    "Job duties affected",
+    "Focus / memory issues",
+    "Attendance issues",
+    "Needs rest breaks",
+    "Daily living limitations",
+    "Household tasks",
+    "Errands",
+    "Sleep",
+    "Personal care",
+    "Transportation",
+    "Social/routine",
+  ];
+
+  const labelPattern = new RegExp(`\\s+(?=(${labelBreaks.map(escapeRegExp).join("|")}):)`, "gi");
+
+  const normalized = value
+    .replace(/\r\n/g, "\n")
+    .replace(/[•▪◦]/g, "\n")
+    .replace(labelPattern, "\n")
+    .trim();
+
+  const chunks = normalized
+    .split(/\n+/)
+    .map((item) => item.trim().replace(/^[-–—*]\s*/, ""))
+    .filter(Boolean);
+
+  const items: string[] = [];
+  for (const chunk of chunks) {
+    const sentencePieces = chunk.length > 260
+      ? chunk.split(/(?<=[.!?])\s+(?=[A-Z])/).map((item) => item.trim()).filter(Boolean)
+      : [chunk];
+    items.push(...sentencePieces);
+  }
+
+  return Array.from(new Set(items));
+}
+
+function ListedTextBlock({ value }: { value: string | null | undefined }) {
+  const items = textToListItems(value);
+
+  if (items.length === 0) {
+    return <p className="text-sm italic text-gray-400">Not provided.</p>;
+  }
+
+  return (
+    <ul className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+      {items.map((item, index) => (
+        <li key={`${index}-${item.slice(0, 24)}`} className="flex gap-2 leading-relaxed">
+          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1a3a5c]" aria-hidden="true" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function LeadDetailModal({
   leadId,
   role,
@@ -293,25 +377,13 @@ function LeadDetailModal({
               </section>
 
               <section>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Medical Summary</h3>
-                {lead.medical_summary ? (
-                  <p className="whitespace-pre-wrap rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-                    {lead.medical_summary}
-                  </p>
-                ) : (
-                  <p className="text-sm italic text-gray-400">Not provided.</p>
-                )}
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Medical Details</h3>
+                <ListedTextBlock value={lead.medical_summary} />
               </section>
 
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Additional Notes</h3>
-                {lead.additional_notes ? (
-                  <p className="whitespace-pre-wrap rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-                    {lead.additional_notes}
-                  </p>
-                ) : (
-                  <p className="text-sm italic text-gray-400">Not provided.</p>
-                )}
+                <ListedTextBlock value={lead.additional_notes} />
               </section>
 
               <section className="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
