@@ -128,7 +128,7 @@ export async function POST(request: Request) {
 
     for (const user of users) {
       const account = accountMap.get(user.partner_account_id) ?? null;
-      if (accountIsAllowed(account)) {
+      if (account && accountIsAllowed(account)) {
         resolvedUser = user;
         resolvedAccount = account;
         resolvedAccountId = account.id;

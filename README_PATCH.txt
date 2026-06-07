@@ -1,12 +1,10 @@
-Partner login code account lookup fix
+Partner login code account lookup fix 2
 
-Replace this file in the repo:
-app/api/partner/request-login/route.ts
+Fixes the Vercel TypeScript build error in app/api/partner/request-login/route.ts:
 
-What it fixes:
-- If the same email exists on more than one partner account, the login route no longer stops at an older inactive/suspended account.
-- It checks all active/pending users with that email and selects the first one attached to an active/pending partner account.
-- It also normalizes partner account status before checking active/pending.
+  'account' is possibly 'null'
+
+The matching loop now explicitly checks `account && accountIsAllowed(account)` before reading account.id.
 
 SQL migration needed: No
 Vercel ENV needed: No
