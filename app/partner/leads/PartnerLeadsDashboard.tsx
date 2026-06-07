@@ -129,83 +129,203 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function textToListItems(value: string | null | undefined) {
-  if (!value || !value.trim()) return [];
+type ListedSection = {
+  label: string | null;
+  items: string[];
+};
 
-  const labelBreaks = [
-    "Additional conditions",
-    "Condition changes",
-    "Current work status",
-    "Medical condition",
-    "Duration of condition",
-    "Application status",
-    "Impact on daily work",
-    "Ability to lift / carry",
-    "Ability to sit / stand",
-    "Sitting limit",
-    "Standing limit",
-    "Walking limit",
-    "Lifting limit",
-    "Has treating doctor",
-    "Specialist care",
-    "Hospital / ER visits",
-    "Prescribed medication",
-    "Medication side effects",
-    "Assistive devices",
-    "Medical records",
-    "Job duties affected",
-    "Focus / memory issues",
-    "Attendance issues",
-    "Needs rest breaks",
-    "Daily living limitations",
-    "Household tasks",
-    "Errands",
-    "Sleep",
-    "Personal care",
-    "Transportation",
-    "Social/routine",
-  ];
+const DETAIL_LABELS = [
+  "Primary condition",
+  "Additional conditions",
+  "Condition changes",
+  "Condition duration",
+  "Duration of condition",
+  "Reported work impact",
+  "Impact on daily work",
+  "Current work status",
+  "Currently working",
+  "Monthly earnings range",
+  "Last worked",
+  "Reduced hours due to condition",
+  "Medical condition",
+  "Application status",
+  "Readiness status",
+  "Ability to lift / carry",
+  "Ability to sit / stand",
+  "Sitting limit",
+  "Standing limit",
+  "Walking limit",
+  "Lifting limit",
+  "Has treating doctor",
+  "Recent doctor visit",
+  "Visit recency",
+  "Specialist care",
+  "Hospital / ER visits",
+  "Prescribed medication",
+  "Medication side effects noted",
+  "Medication side effects",
+  "Assistive devices",
+  "Medical records history",
+  "Medical records",
+  "Treatment and documentation highlights",
+  "Job duties affected",
+  "Focus / memory issues",
+  "Attendance issues",
+  "Needs rest breaks",
+  "Daily living limitations",
+  "Household tasks",
+  "Errands",
+  "Sleep",
+  "Personal care",
+  "Transportation",
+  "Social/routine",
+  "Has advocate",
+  "Advocate contact consent",
+].sort((a, b) => b.length - a.length);
 
-  const labelPattern = new RegExp(`\\s+(?=(${labelBreaks.map(escapeRegExp).join("|")}):)`, "gi");
-
-  const normalized = value
+function normalizeDetailText(value: string) {
+  return value
     .replace(/\r\n/g, "\n")
     .replace(/[•▪◦]/g, "\n")
+    .replace(/\s+([.,;:])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanDetailValue(value: string) {
+  return normalizeDetailText(value)
+    .replace(/^[-–—*]\s*/, "")
+    .replace(/^[:\s]+/, "")
+    .replace(/\s+([.,;:])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+$/g, "")
+    .replace(/^[.\s]+|[.\s]+$/g, "")
+    .trim();
+}
+
+function titleCaseLabel(label: string) {
+  return label
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .replace(/DBS/g, "DBS")
+    .replace(/SSDI/g, "SSDI")
+    .replace(/SSI/g, "SSI");
+}
+
+function splitValueIntoListItems(value: string) {
+  const cleaned = cleanDetailValue(value);
+  if (!cleaned) return [];
+
+  // Keep short answers together. Split longer values only when there are clear sentence breaks.
+  if (cleaned.length < 120) return [cleaned];
+
+  return cleaned
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map(cleanDetailValue)
+    .filter(Boolean);
+}
+
+function parseTreatmentHighlights(value: string) {
+  const cleaned = cleanDetailValue(value);
+  if (!cleaned) return [];
+
+  const patterns: Array<[string, RegExp]> = [
+    ["Treating doctor", /\btreating doctor\s+(yes|no|not sure|unknown)/i],
+    ["Recent doctor visit", /\brecent doctor visit\s+(yes|no|not sure|unknown)/i],
+    ["Visit recency", /\bvisit recency\s+([a-z0-9_\-/ ]+?)(?=\s+specialist care|\s+prescribed medication|\s+records history|\s+documentation|$)/i],
+    ["Specialist care", /\bspecialist care\s+(yes|no|not sure|unknown)/i],
+    ["Prescribed medication", /\bprescribed medication\s+(yes|no|not sure|unknown)/i],
+    ["Records history", /\brecords history\s+([a-z0-9_\-/ ]+?)(?=\s+documentation|$)/i],
+    ["Documentation", /\bdocumentation\s+(yes|no|not sure|unknown)/i],
+  ];
+
+  const parsed = patterns
+    .map(([label, regex]) => {
+      const match = cleaned.match(regex);
+      if (!match?.[1]) return null;
+      return `${label}: ${cleanDetailValue(match[1])}`;
+    })
+    .filter((item): item is string => Boolean(item));
+
+  return parsed.length > 0 ? parsed : [cleaned];
+}
+
+function parseTextSections(value: string | null | undefined): ListedSection[] {
+  if (!value || !value.trim()) return [];
+
+  const labelPattern = new RegExp(`\\s*(?=(${DETAIL_LABELS.map(escapeRegExp).join("|")}):)`, "gi");
+  const normalized = normalizeDetailText(value)
     .replace(labelPattern, "\n")
     .trim();
 
-  const chunks = normalized
+  const rawLines = normalized
     .split(/\n+/)
-    .map((item) => item.trim().replace(/^[-–—*]\s*/, ""))
+    .map((item) => item.trim())
     .filter(Boolean);
 
-  const items: string[] = [];
-  for (const chunk of chunks) {
-    const sentencePieces = chunk.length > 260
-      ? chunk.split(/(?<=[.!?])\s+(?=[A-Z])/).map((item) => item.trim()).filter(Boolean)
-      : [chunk];
-    items.push(...sentencePieces);
+  const sections: ListedSection[] = [];
+
+  for (const rawLine of rawLines) {
+    const line = rawLine.replace(/^[-–—*]\s*/, "").trim();
+    const match = line.match(/^([^:]{2,80}):\s*(.*)$/);
+
+    if (!match) {
+      const items = splitValueIntoListItems(line);
+      if (items.length > 0) sections.push({ label: null, items });
+      continue;
+    }
+
+    const label = titleCaseLabel(match[1].trim());
+    const rest = match[2] ?? "";
+    const items = label.toLowerCase().includes("treatment and documentation")
+      ? parseTreatmentHighlights(rest)
+      : splitValueIntoListItems(rest);
+
+    sections.push({ label, items: items.length > 0 ? items : ["Not provided"] });
   }
 
-  return Array.from(new Set(items));
+  // Combine adjacent duplicate labels while keeping every listed item.
+  const combined: ListedSection[] = [];
+  for (const section of sections) {
+    const previous = combined[combined.length - 1];
+    if (previous && previous.label === section.label) {
+      previous.items.push(...section.items);
+    } else {
+      combined.push({ label: section.label, items: [...section.items] });
+    }
+  }
+
+  return combined.map((section) => ({
+    ...section,
+    items: Array.from(new Set(section.items.map(cleanDetailValue).filter(Boolean))),
+  })).filter((section) => section.items.length > 0);
 }
 
 function ListedTextBlock({ value }: { value: string | null | undefined }) {
-  const items = textToListItems(value);
+  const sections = parseTextSections(value);
 
-  if (items.length === 0) {
+  if (sections.length === 0) {
     return <p className="text-sm italic text-gray-400">Not provided.</p>;
   }
 
   return (
-    <ul className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-      {items.map((item, index) => (
-        <li key={`${index}-${item.slice(0, 24)}`} className="flex gap-2 leading-relaxed">
-          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1a3a5c]" aria-hidden="true" />
-          <span>{item}</span>
-        </li>
+    <div className="space-y-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+      {sections.map((section, sectionIndex) => (
+        <div key={`${section.label ?? "details"}-${sectionIndex}`} className="space-y-1.5">
+          {section.label && (
+            <p className="font-semibold text-[#0d1b2e]">{section.label}</p>
+          )}
+          <ul className="ml-1 space-y-1.5">
+            {section.items.map((item, index) => (
+              <li key={`${sectionIndex}-${index}-${item.slice(0, 24)}`} className="flex gap-2 leading-relaxed">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1a3a5c]" aria-hidden="true" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
 
