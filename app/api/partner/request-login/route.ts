@@ -22,6 +22,11 @@ type PartnerAccountLookup = {
   status: string;
 };
 
+type PartnerAccountPrimaryLookup = PartnerAccountLookup & {
+  contact_first_name: string | null;
+  contact_last_name: string | null;
+};
+
 const ALLOWED_ACCOUNT_STATUSES = ["active", "pending"];
 
 function normalizeStatus(status: string | null | undefined) {
@@ -154,6 +159,81 @@ export async function POST(request: Request) {
     if (account) {
       resolvedAccount = account as PartnerAccountLookup;
       resolvedAccountId = resolvedAccount.id;
+    }
+  }
+
+  // If the email exists on old/inactive test users, the active partner account
+  // primary email can still be the correct login. Fall back to an active/pending
+  // partner account with this email and make sure the account has a usable
+  // partner_user record for that primary contact.
+  if (!resolvedUser) {
+    const { data: primaryAccount } = await supabaseAdmin
+      .from("partner_accounts")
+      .select("id, firm_name, email, status, contact_first_name, contact_last_name")
+      .eq("email", email)
+      .in("status", ["active", "pending"])
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const primary = primaryAccount as PartnerAccountPrimaryLookup | null;
+
+    if (primary && accountIsAllowed(primary)) {
+      resolvedAccount = primary;
+      resolvedAccountId = primary.id;
+
+      const { data: existingPrimaryUser } = await supabaseAdmin
+        .from("partner_users")
+        .select("id, partner_account_id, email, first_name, last_name, status")
+        .eq("partner_account_id", primary.id)
+        .eq("email", email)
+        .maybeSingle();
+
+      if (existingPrimaryUser) {
+        const existing = existingPrimaryUser as PartnerUserLookup;
+        if (normalizeStatus(existing.status) === "active" || normalizeStatus(existing.status) === "pending") {
+          resolvedUser = existing;
+          resolvedUserId = existing.id;
+        } else {
+          // Auto-repair only for the partner account's primary email. This avoids
+          // an old inactive test user blocking the real primary account login.
+          const { data: reactivatedUser, error: reactivateError } = await supabaseAdmin
+            .from("partner_users")
+            .update({ status: "active" })
+            .eq("id", existing.id)
+            .select("id, partner_account_id, email, first_name, last_name, status")
+            .single();
+
+          if (reactivateError) {
+            console.error("[request-login] Failed to reactivate primary partner user:", reactivateError);
+          } else if (reactivatedUser) {
+            resolvedUser = reactivatedUser as PartnerUserLookup;
+            resolvedUserId = resolvedUser.id;
+          }
+        }
+      } else {
+        const { data: createdUser, error: createUserError } = await supabaseAdmin
+          .from("partner_users")
+          .insert({
+            partner_account_id: primary.id,
+            email,
+            first_name: (primary.contact_first_name ?? "Partner").trim() || "Partner",
+            last_name: (primary.contact_last_name ?? "User").trim() || "User",
+            role: "owner",
+            status: "active",
+            invited_at: new Date().toISOString(),
+            accepted_at: new Date().toISOString(),
+          })
+          .select("id, partner_account_id, email, first_name, last_name, status")
+          .single();
+
+        if (createUserError) {
+          console.error("[request-login] Failed to create primary partner user:", createUserError);
+        } else if (createdUser) {
+          resolvedUser = createdUser as PartnerUserLookup;
+          resolvedUserId = resolvedUser.id;
+        }
+      }
     }
   }
 
