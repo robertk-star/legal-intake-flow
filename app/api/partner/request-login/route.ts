@@ -143,10 +143,12 @@ export async function POST(request: Request) {
     }
 
     if (!resolvedUser) {
+      // Do not finalize the inactive/test account match yet. Leave resolvedUser
+      // null so the active primary-account fallback below can still run.
       matchedUsersWithNoAllowedAccount = true;
-      resolvedUser = users[0] ?? null;
-      resolvedUserId = resolvedUser?.id ?? null;
-      resolvedAccountId = resolvedUser?.partner_account_id ?? null;
+      const firstMatchedUser = users[0] ?? null;
+      resolvedUserId = firstMatchedUser?.id ?? null;
+      resolvedAccountId = firstMatchedUser?.partner_account_id ?? null;
       resolvedAccount = resolvedAccountId ? accountMap.get(resolvedAccountId) ?? null : null;
     }
   } else {
