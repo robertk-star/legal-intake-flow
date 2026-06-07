@@ -556,3 +556,16 @@ No new Vercel environment variable is required.
 6. Confirm the banner says **Ready for DBS production ingest** only when required checks are complete.
 7. Confirm dry-run, duplicate, and rejected/no-consent events still appear in the existing diagnostics tables.
 8. Confirm partner accounts, billing, Stripe, routing, and public pages are unchanged.
+
+
+## Partner Email Code Login
+
+Partner/client login now uses a 6-digit email code from `/partner/login`. Existing one-time token links remain supported for admin-generated invitations.
+
+Required SQL before testing this login change:
+
+```text
+sql/section30_partner_login_email_codes.sql
+```
+
+No new Vercel ENV variable is required if the existing email setup is already configured (`RESEND_API_KEY`, `LIF_EMAIL_FROM`).

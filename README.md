@@ -1578,3 +1578,16 @@ No new SQL migration is required for Phase 55.
 No new Vercel environment variable is required.
 
 This phase uses the existing diagnostics and receipt tables/columns from earlier DBS ingest phases.
+
+
+## Partner Email Code Login
+
+Partner/client login now uses a 6-digit email code from `/partner/login`. Existing one-time token links remain supported for admin-generated invitations.
+
+Required SQL before testing this login change:
+
+```text
+sql/section30_partner_login_email_codes.sql
+```
+
+No new Vercel ENV variable is required if the existing email setup is already configured (`RESEND_API_KEY`, `LIF_EMAIL_FROM`).
