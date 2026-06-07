@@ -183,9 +183,6 @@ export default async function PartnerAccountPage() {
               <Link href="/partner/team" className="text-white/70 hover:text-white">
                 Team
               </Link>
-              <Link href="/partner/integrations" className="text-white/70 hover:text-white">
-                Integrations
-              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-4">

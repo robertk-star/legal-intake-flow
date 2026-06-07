@@ -98,8 +98,8 @@ export default function HomePage() {
             <Button href="/how-it-works" variant="outline" size="lg">
               How It Works
             </Button>
-            <Link href="/example-reports" className="text-sm font-semibold text-blue-200 hover:text-white hover:underline">
-              View example reports →
+            <Link href="/lead-quality" className="text-sm font-semibold text-blue-200 hover:text-white hover:underline">
+              See our lead quality process →
             </Link>
           </div>
         </div>
@@ -125,12 +125,18 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-          <div className="mt-10 text-center">
+          <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-8">
             <Link
               href="/how-it-works"
               className="text-blue-600 font-medium hover:underline"
             >
               View the full process →
+            </Link>
+            <Link
+              href="/lead-quality"
+              className="text-blue-600 font-medium hover:underline"
+            >
+              See how lead quality is reviewed →
             </Link>
           </div>
         </div>
@@ -201,6 +207,11 @@ export default function HomePage() {
                 <p className="text-sm text-gray-400">{s.desc}</p>
               </div>
             ))}
+          </div>
+          <div className="mt-8 text-center">
+            <Button href="/lead-quality" variant="outline" size="md">
+              View Lead Quality Process
+            </Button>
           </div>
         </div>
       </section>

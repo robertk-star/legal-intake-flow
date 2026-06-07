@@ -4,6 +4,7 @@ import Link from "next/link";
 const FOOTER_LINKS = [
   { href: "/how-it-works", label: "How It Works" },
   { href: "/for-attorneys", label: "For Attorneys" },
+  { href: "/lead-quality", label: "Lead Quality" },
   { href: "/example-reports", label: "Example Reports" },
   { href: "/request-access", label: "Request Access" },
   { href: "/admin/login", label: "Admin" },

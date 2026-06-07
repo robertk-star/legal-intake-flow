@@ -67,7 +67,6 @@ export default async function PartnerReportsPage() {
               <Link href="/partner/billing" className="text-white/70 hover:text-white">Billing</Link>
               <Link href="/partner/invoices" className="text-white/70 hover:text-white">Invoices</Link>
               <Link href="/partner/team" className="text-white/70 hover:text-white">Team</Link>
-              <Link href="/partner/integrations" className="text-white/70 hover:text-white">Integrations</Link>
             </nav>
           </div>
           <PartnerLogoutButton />

@@ -120,7 +120,10 @@ export default function ForAttorneysPage() {
           <p className="mt-6 text-center text-sm text-gray-500">
             Exact data fields may vary based on screening completion and partner delivery configuration.
           </p>
-          <div className="mt-8 text-center">
+          <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Button href="/lead-quality" variant="outline" size="lg">
+              View Lead Quality Process
+            </Button>
             <Button href="/example-reports" variant="outline" size="lg">
               View Redacted Example Reports
             </Button>
