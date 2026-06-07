@@ -1591,3 +1591,45 @@ sql/section30_partner_login_email_codes.sql
 ```
 
 No new Vercel ENV variable is required if the existing email setup is already configured (`RESEND_API_KEY`, `LIF_EMAIL_FROM`).
+
+## Partner Webhook and API Access
+
+Partners can configure integrations from `/partner/integrations`.
+
+### Partner API access
+
+Owner/admin partner users can generate an API key. The raw key is shown one time only. LIF stores only a SHA-256 hash and the last four characters.
+
+External systems can pull assigned leads with:
+
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://legalintakeflow.com/api/external/partner/leads?limit=25"
+```
+
+The endpoint only returns leads assigned to the authenticated partner account. Optional filters:
+
+- `limit` — max 200
+- `since` — ISO timestamp, filters by `updated_at`
+- `partner_response_status` — new, reviewing, contact_attempted, contacted, accepted, declined, retained, closed
+
+### Partner webhooks
+
+Owner/admin partner users can save an HTTPS webhook URL and generate a signing secret. When an admin assigns or reassigns a lead to that partner, LIF sends a best-effort POST to the partner webhook URL with:
+
+- `event` — `lead.assigned` or `lead.reassigned`
+- `sent_at`
+- `partner_account_id`
+- `lead`
+
+Headers include:
+
+- `x-lif-event`
+- `x-lif-partner-account-id`
+- `x-lif-signature` when a webhook secret is configured
+
+Webhook delivery never blocks the admin assignment workflow. Last delivery status/error is shown on `/partner/integrations`.
+
+### Required migration
+
+Run `sql/section30_partner_webhook_api_access.sql` before testing the integration settings page.

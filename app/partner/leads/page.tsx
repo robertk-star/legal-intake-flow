@@ -91,6 +91,9 @@ export default async function PartnerLeadsPage() {
               <Link href="/partner/team" className="text-white/70 hover:text-white">
                 Team
               </Link>
+              <Link href="/partner/integrations" className="text-white/70 hover:text-white">
+                Integrations
+              </Link>
             </nav>
           </div>
           <PartnerLogoutButton />

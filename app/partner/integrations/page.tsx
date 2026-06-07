@@ -3,15 +3,13 @@ import { redirect } from "next/navigation";
 import { getAuthenticatedPartnerSession, type PartnerRole } from "@/lib/partnerAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import PartnerLogoutButton from "../account/LogoutButton";
-import PartnerReportsDashboard from "./PartnerReportsDashboard";
+import IntegrationsDashboard from "./IntegrationsDashboard";
 
 interface PartnerAccountHeader {
-  id: string;
   firm_name: string;
 }
 
 interface PartnerUserHeader {
-  id: string;
   first_name: string;
   last_name: string;
   email: string;
@@ -32,13 +30,13 @@ const ROLE_COLORS: Record<PartnerRole, string> = {
   viewer: "bg-gray-100 text-gray-700",
 };
 
-export default async function PartnerReportsPage() {
+export default async function PartnerIntegrationsPage() {
   const session = await getAuthenticatedPartnerSession();
   if (!session) redirect("/partner/login");
 
   const { data: account, error: accountError } = await supabaseAdmin
     .from("partner_accounts")
-    .select("id, firm_name")
+    .select("firm_name")
     .eq("id", session.partnerAccountId)
     .single();
 
@@ -46,13 +44,14 @@ export default async function PartnerReportsPage() {
 
   const { data: user } = await supabaseAdmin
     .from("partner_users")
-    .select("id, first_name, last_name, email, role")
+    .select("first_name, last_name, email, role")
     .eq("id", session.partnerUserId)
     .single();
 
   const partnerAccount = account as PartnerAccountHeader;
   const partnerUser = user as PartnerUserHeader | null;
   const displayName = partnerUser ? `${partnerUser.first_name} ${partnerUser.last_name}` : "Partner User";
+  const role = partnerUser?.role ?? session.role;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -63,11 +62,11 @@ export default async function PartnerReportsPage() {
               <Link href="/partner/dashboard" className="text-white/70 hover:text-white">Dashboard</Link>
               <Link href="/partner/account" className="text-white/70 hover:text-white">Account</Link>
               <Link href="/partner/leads" className="text-white/70 hover:text-white">Leads</Link>
-              <Link href="/partner/reports" className="font-semibold text-white">Reports</Link>
+              <Link href="/partner/reports" className="text-white/70 hover:text-white">Reports</Link>
               <Link href="/partner/billing" className="text-white/70 hover:text-white">Billing</Link>
               <Link href="/partner/invoices" className="text-white/70 hover:text-white">Invoices</Link>
               <Link href="/partner/team" className="text-white/70 hover:text-white">Team</Link>
-              <Link href="/partner/integrations" className="text-white/70 hover:text-white">Integrations</Link>
+              <Link href="/partner/integrations" className="font-semibold text-white">Integrations</Link>
             </nav>
           </div>
           <PartnerLogoutButton />
@@ -77,24 +76,26 @@ export default async function PartnerReportsPage() {
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-10 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#0d1b2e]">Performance Reports</h1>
+            <h1 className="text-2xl font-bold text-[#0d1b2e]">Webhook & API Access</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Review lead activity, response performance, billing status, and trends for {partnerAccount.firm_name}.
+              Connect {partnerAccount.firm_name} to your CRM, case management system, or internal database.
             </p>
           </div>
           {partnerUser && (
-            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-left shadow-sm sm:text-right">
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right shadow-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Signed in as</p>
               <p className="mt-0.5 text-sm font-semibold text-[#0d1b2e]">{displayName}</p>
               <p className="text-xs text-gray-500">{partnerUser.email}</p>
-              <div className="mt-1.5 flex sm:justify-end">
-                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${ROLE_COLORS[session.role]}`}>{ROLE_LABELS[session.role]}</span>
+              <div className="mt-1.5 flex justify-end">
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${ROLE_COLORS[role] ?? "bg-gray-100 text-gray-700"}`}>
+                  {ROLE_LABELS[role] ?? role}
+                </span>
               </div>
             </div>
           )}
         </div>
 
-        <PartnerReportsDashboard />
+        <IntegrationsDashboard role={role} />
       </main>
     </div>
   );

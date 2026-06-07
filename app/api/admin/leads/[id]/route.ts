@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendLeadAssignedNotifications } from "@/lib/emailNotifications";
+import { sendPartnerLeadWebhook } from "@/lib/partnerIntegrations";
 
 const VALID_STATUSES = [
   "new", "reviewing", "ready_to_assign", "assigned", "closed", "rejected", "spam",
@@ -224,6 +225,17 @@ export async function PATCH(
       partnerAccountId: assignmentEvent.partnerAccountId,
       assignmentType: assignmentEvent.assignmentType,
     });
+
+    const webhookSummary = await sendPartnerLeadWebhook({
+      leadId: id,
+      partnerAccountId: assignmentEvent.partnerAccountId,
+      eventType: assignmentEvent.assignmentType === "reassignment" ? "lead.reassigned" : "lead.assigned",
+    });
+
+    notificationSummary = {
+      ...(notificationSummary ?? {}),
+      webhook: webhookSummary,
+    };
   }
 
   return NextResponse.json({ success: true, data, notifications: notificationSummary });
