@@ -22,6 +22,16 @@ type PartnerAccountLookup = {
   status: string;
 };
 
+const ALLOWED_ACCOUNT_STATUSES = ["active", "pending"];
+
+function normalizeStatus(status: string | null | undefined) {
+  return String(status ?? "").trim().toLowerCase();
+}
+
+function accountIsAllowed(account: PartnerAccountLookup | null | undefined) {
+  return ALLOWED_ACCOUNT_STATUSES.includes(normalizeStatus(account?.status));
+}
+
 async function logLoginCodeAttempt(input: {
   email: string;
   status: "skipped" | "failed";
@@ -59,8 +69,8 @@ async function logLoginCodeAttempt(input: {
  * POST /api/partner/request-login
  *
  * Accepts a partner email, records a login request, and returns a neutral
- * confirmation. If the email matches an active/pending partner user, LIF emails
- * a short numeric login code instead of a magic login link.
+ * confirmation. If the email matches an active/pending partner user that belongs
+ * to an active/pending partner account, LIF emails a short numeric login code.
  */
 export async function POST(request: Request) {
   const limited = rateLimitResponse(request, { keyPrefix: "partner-request-login", limit: 5, windowMs: 15 * 60 * 1000 });
@@ -84,32 +94,56 @@ export async function POST(request: Request) {
     ?? null;
   const userAgent = request.headers.get("user-agent") ?? null;
 
-  const { data: partnerUser } = await supabaseAdmin
+  // The same email may exist on more than one partner account, especially after
+  // testing. Do not stop at the oldest matching user if that user belongs to an
+  // inactive/suspended test account. Find the first matching user whose linked
+  // partner account is active or pending.
+  const { data: matchedUsers } = await supabaseAdmin
     .from("partner_users")
-    .select("id, partner_account_id, email, first_name, last_name, status")
+    .select("id, partner_account_id, email, first_name, last_name, status, created_at")
     .eq("email", email)
     .in("status", ["active", "pending"])
     .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .limit(25);
 
   let resolvedAccountId: string | null = null;
   let resolvedUserId: string | null = null;
   let resolvedUser: PartnerUserLookup | null = null;
   let resolvedAccount: PartnerAccountLookup | null = null;
+  let matchedUsersWithNoAllowedAccount = false;
 
-  if (partnerUser) {
-    resolvedUser = partnerUser as PartnerUserLookup;
-    resolvedAccountId = resolvedUser.partner_account_id;
-    resolvedUserId = resolvedUser.id;
+  const users = (matchedUsers ?? []) as unknown as PartnerUserLookup[];
 
-    const { data: account } = await supabaseAdmin
+  if (users.length > 0) {
+    const accountIds = Array.from(new Set(users.map((user) => user.partner_account_id).filter(Boolean)));
+    const { data: accounts } = await supabaseAdmin
       .from("partner_accounts")
       .select("id, firm_name, email, status")
-      .eq("id", resolvedUser.partner_account_id)
-      .maybeSingle();
+      .in("id", accountIds);
 
-    if (account) resolvedAccount = account as PartnerAccountLookup;
+    const accountMap = new Map<string, PartnerAccountLookup>();
+    for (const account of (accounts ?? []) as unknown as PartnerAccountLookup[]) {
+      accountMap.set(account.id, account);
+    }
+
+    for (const user of users) {
+      const account = accountMap.get(user.partner_account_id) ?? null;
+      if (accountIsAllowed(account)) {
+        resolvedUser = user;
+        resolvedAccount = account;
+        resolvedAccountId = account.id;
+        resolvedUserId = user.id;
+        break;
+      }
+    }
+
+    if (!resolvedUser) {
+      matchedUsersWithNoAllowedAccount = true;
+      resolvedUser = users[0] ?? null;
+      resolvedUserId = resolvedUser?.id ?? null;
+      resolvedAccountId = resolvedUser?.partner_account_id ?? null;
+      resolvedAccount = resolvedAccountId ? accountMap.get(resolvedAccountId) ?? null : null;
+    }
   } else {
     const { data: account } = await supabaseAdmin
       .from("partner_accounts")
@@ -142,22 +176,25 @@ export async function POST(request: Request) {
 
   const loginRequestId = (loginRequest?.id as string | undefined) ?? null;
 
-  const accountIsAllowed = resolvedAccount?.status === "active" || resolvedAccount?.status === "pending";
-
   if (!resolvedUser) {
     await logLoginCodeAttempt({
       email,
       status: "skipped",
-      reason: "No active or pending partner user matched this email address.",
+      reason: resolvedAccount
+        ? "Partner account matched this email, but no active or pending partner user matched. Add or activate a partner user for this email."
+        : "No active or pending partner user matched this email address.",
       partnerAccountId: resolvedAccountId,
       partnerUserId: resolvedUserId,
       loginRequestId,
     });
-  } else if (!resolvedAccount || !accountIsAllowed) {
+  } else if (!resolvedAccount || !accountIsAllowed(resolvedAccount)) {
+    const accountStatus = resolvedAccount?.status ?? "not found";
     await logLoginCodeAttempt({
       email,
       status: "skipped",
-      reason: "Partner user matched, but the partner account is not active or pending.",
+      reason: matchedUsersWithNoAllowedAccount
+        ? `Partner user matched, but no matching user is attached to an active or pending partner account. First matched account status: ${accountStatus}.`
+        : `Partner user matched, but the partner account is not active or pending. Account status: ${accountStatus}.`,
       partnerAccountId: resolvedAccountId,
       partnerUserId: resolvedUserId,
       loginRequestId,
