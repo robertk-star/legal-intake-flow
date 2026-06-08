@@ -64,6 +64,8 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 | `/partner/login` | One-time token login page — validates token, sets partner session cookie, redirects to account |
 | `/partner/account` | Partner profile page — firm info, account status, signed-in user info |
 | `/partner/leads` | Partner lead dashboard — assigned DBS leads, lead detail, partner response status, partner notes |
+| `/partner/integrations` | Partner integrations dashboard — manage API access keys and webhook delivery settings |
+| `/partner/integrations/support` | Partner integrations support guide — API/webhook developer documentation |
 
 ---
 
@@ -124,6 +126,12 @@ DBS pushes approved leads to LIF via `POST /api/intake/ingest` using a shared se
 | `/api/partner/leads` | `GET` | List leads assigned to the authenticated partner account |
 | `/api/partner/leads/[id]` | `GET` / `PATCH` | Get assigned lead detail; update partner response status and partner notes |
 
+### External API (Authorization: Bearer API_KEY)
+
+| Route | Method | Description |
+|---|---|---|
+| `/api/external/partner/leads` | `GET` | External API for partners to pull assigned leads |
+
 ---
 
 ## Environment Variables
@@ -168,6 +176,7 @@ Run migrations in order against your Supabase project using the SQL Editor.
 | `sql/section10_partner_routing_rules.sql` | **Run this for Phase 12.** Adds structured `routing_states`, routing timestamps/notes, backfills from `states_served`, and adds indexes for routing eligibility previews |
 | `sql/section11_lead_assignment_engine.sql` | **Run this for Phase 13.** Adds `lead_assignment_events` audit table for manual, best-match, and reassignment events |
 | `sql/section12_email_notifications.sql` | **Run this for Phase 14.** Adds `email_notifications` delivery log table for partner login-link emails and lead assignment notifications |
+| `sql/section31_partner_webhook_api_access.sql` | **Run this for Partner Integrations.** Adds API access, webhook configuration columns to `partner_accounts`, and supports developer API/webhook integrations |
 
 > **Note:** `section07_leads.sql` created the initial leads table for a public intake approach that has been superseded. Run `section08_dbs_lead_ingestion.sql` after `section07` (or instead of it on a fresh database) to align the schema with the DBS ingestion architecture.
 
@@ -217,7 +226,7 @@ Eligibility checks include:
 - application stage matches accepted stages (`initial`, `appeal`, `hearing`)
 - current-month assignments are below the parsed monthly capacity
 
-This preview is informational only. Admin must still manually choose a partner and click **Save Changes**. No automatic matching or routing is included in Phase 12.
+This preview is informational only. The Assign button in the Routing Eligibility Preview now immediately assigns that selected partner. No automatic matching or routing is included in Phase 12.
 
 ## Lead Assignment Engine
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendLeadAssignedNotifications } from "@/lib/emailNotifications";
+import { sendPartnerLeadWebhook } from "@/lib/partnerIntegrations";
 
 const VALID_STATUSES = [
   "new", "reviewing", "ready_to_assign", "assigned", "closed", "rejected", "spam",
@@ -223,6 +224,14 @@ export async function PATCH(
       leadId: id,
       partnerAccountId: assignmentEvent.partnerAccountId,
       assignmentType: assignmentEvent.assignmentType,
+    });
+
+    // Send partner webhook after manual assignment/reassignment, regardless of email notification settings.
+    // Best-effort only: failures are captured on the partner account and must not block assignment.
+    await sendPartnerLeadWebhook({
+      leadId: id,
+      partnerAccountId: assignmentEvent.partnerAccountId,
+      eventType: assignmentEvent.assignmentType === "reassignment" ? "lead.reassigned" : "lead.assigned",
     });
   }
 

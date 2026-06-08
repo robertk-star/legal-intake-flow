@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { bestEligiblePartner, getPartnerEligibilityForLeadId, type PartnerEligibilityResult } from "@/lib/leadRouting";
 import { sendLeadAssignedNotifications } from "@/lib/emailNotifications";
+import { sendPartnerLeadWebhook } from "@/lib/partnerIntegrations";
 
 export type LeadAssignmentSettings = {
   id: string;
@@ -229,6 +230,16 @@ export async function assignBestMatchToLead(input: {
       leadId: input.leadId,
       partnerAccountId: bestPartnerId,
       assignmentType: eventAssignmentType === "reassignment" ? "reassignment" : "best_match",
+    });
+  }
+
+  // Send partner webhook if lead is newly assigned or reassigned, regardless of email notification settings.
+  // Best-effort only: failures are captured on the partner account and must not block assignment.
+  if (!samePartner) {
+    await sendPartnerLeadWebhook({
+      leadId: input.leadId,
+      partnerAccountId: bestPartnerId,
+      eventType: eventAssignmentType === "reassignment" ? "lead.reassigned" : "lead.assigned",
     });
   }
 
