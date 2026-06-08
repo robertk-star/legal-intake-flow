@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type IntegrationSettings = {
@@ -163,6 +164,23 @@ export default function IntegrationsDashboard({ role }: { role: string }) {
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div>}
       {success && <div className="rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-700">{success}</div>}
+
+      <section className="rounded-2xl border border-blue-200 bg-blue-50 p-6 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-[#0d1b2e]">Need help connecting your system?</h2>
+            <p className="mt-1 text-sm text-blue-900/80">
+              View the full API key and webhook setup guide, including available fields, sample requests, and webhook signature instructions.
+            </p>
+          </div>
+          <Link
+            href="/partner/integrations/support"
+            className="inline-flex items-center justify-center rounded-lg bg-[#1a3a5c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#10263d]"
+          >
+            View Setup Guide
+          </Link>
+        </div>
+      </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
