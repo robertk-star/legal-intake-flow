@@ -1,4 +1,4 @@
-import tls from "tls";
+import * as tls from "tls";
 
 export type LeadEmailSendInput = {
   to: string;
@@ -189,7 +189,7 @@ async function sendViaSmtp(input: {
   ].join("\r\n");
 
   try {
-    await smtpCommand(socket, `EHLO legalintakeflow.com`, [250]);
+    await smtpCommand(socket, "EHLO legalintakeflow.com", [250]);
     await smtpCommand(socket, "AUTH LOGIN", [334]);
     await smtpCommand(socket, Buffer.from(input.user, "utf8").toString("base64"), [334]);
     await smtpCommand(socket, Buffer.from(input.password, "utf8").toString("base64"), [235]);
