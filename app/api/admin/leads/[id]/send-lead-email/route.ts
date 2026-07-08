@@ -57,7 +57,7 @@ export async function POST(
 
   const { data: lead, error: leadError } = await supabaseAdmin
     .from("leads")
-    .select("id, first_name, last_name, email")
+    .select("id, first_name, last_name, email, lead_outreach_email_count")
     .eq("id", id)
     .is("deleted_at", null)
     .single();
@@ -66,7 +66,13 @@ export async function POST(
     return NextResponse.json({ error: "Lead not found." }, { status: 404 });
   }
 
-  const leadRow = lead as { id: string; first_name: string | null; last_name: string | null; email: string | null };
+  const leadRow = lead as {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    lead_outreach_email_count?: number | null;
+  };
   const recipientEmail = str(leadRow.email)?.toLowerCase();
   const recipientName = displayName(leadRow.first_name, leadRow.last_name);
 
@@ -140,29 +146,18 @@ export async function POST(
   }
 
   if (result.sent) {
-    await supabaseAdmin
-      .from("leads")
-      .update({
-        lead_outreach_email_sent_at: now,
-        lead_outreach_email_count: supabaseAdmin.rpc ? undefined : undefined,
-      })
-      .eq("id", id);
-
-    // Increment separately so older databases that have not run Phase 52 fail only non-blockingly.
-    const { data: currentLead } = await supabaseAdmin
-      .from("leads")
-      .select("lead_outreach_email_count")
-      .eq("id", id)
-      .maybeSingle();
-
-    const currentCount = Number((currentLead as { lead_outreach_email_count?: number } | null)?.lead_outreach_email_count ?? 0);
-    await supabaseAdmin
+    const currentCount = Number(leadRow.lead_outreach_email_count ?? 0);
+    const { error: leadUpdateError } = await supabaseAdmin
       .from("leads")
       .update({
         lead_outreach_email_sent_at: now,
         lead_outreach_email_count: currentCount + 1,
       })
       .eq("id", id);
+
+    if (leadUpdateError) {
+      console.warn("[POST /api/admin/leads/[id]/send-lead-email] Lead outreach summary update failed:", leadUpdateError.message);
+    }
   }
 
   if (!result.sent) {
