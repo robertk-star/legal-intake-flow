@@ -1,16 +1,3 @@
 {
-  "redirects": [
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "legalintakeflow.com" }],
-      "destination": "https://v2.legalintakeflow.com/:path*",
-      "permanent": true
-    },
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.legalintakeflow.com" }],
-      "destination": "https://v2.legalintakeflow.com/:path*",
-      "permanent": true
-    }
-  ]
+  "redirects": []
 }
