@@ -19,24 +19,13 @@ export function Header() {
     <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex flex-shrink-0 items-center gap-2 sm:gap-3" aria-label="Legal Intake Flow — Home">
-          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#0d1b2e] p-1 sm:h-12 sm:w-12">
-            <img
-              src="/images/lif-logo.png"
-              alt=""
-              width="56"
-              height="56"
-              className="h-full w-full object-contain"
-              aria-hidden="true"
-              draggable={false}
-            />
-          </span>
+        <Link href="/" className="flex-shrink-0" aria-label="Legal Intake Flow — Home">
           <img
-            src="/images/lif-name-logo.png"
+            src="/images/legal-intake-flow-logo.svg"
             alt="Legal Intake Flow"
-            width="320"
-            height="60"
-            className="h-8 w-auto max-w-[170px] object-contain sm:h-11 sm:max-w-[250px]"
+            width="1298"
+            height="195"
+            className="h-8 w-auto max-w-[210px] object-contain sm:h-11 sm:max-w-[300px]"
             draggable={false}
           />
         </Link>
