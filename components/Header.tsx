@@ -19,13 +19,22 @@ export function Header() {
     <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex-shrink-0" aria-label="Legal Intake Flow — Home">
+        <Link href="/" className="flex flex-shrink-0 items-center gap-2 sm:gap-3" aria-label="Legal Intake Flow — Home">
+          <img
+            src="/images/lif-logo.png"
+            alt=""
+            width="56"
+            height="56"
+            className="h-9 w-9 flex-shrink-0 object-contain sm:h-11 sm:w-11"
+            aria-hidden="true"
+            draggable={false}
+          />
           <img
             src="/images/lif-name-logo.png"
             alt="Legal Intake Flow"
             width="320"
             height="60"
-            className="h-8 w-auto max-w-[200px] object-contain sm:h-11 sm:max-w-[280px]"
+            className="h-8 w-auto max-w-[170px] object-contain sm:h-11 sm:max-w-[250px]"
             draggable={false}
           />
         </Link>
